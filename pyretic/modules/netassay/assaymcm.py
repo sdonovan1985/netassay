@@ -63,6 +63,11 @@ class NetAssayMatch(DynamicFilter):
         return Classifier([r1, r2])
 
     def __eq__(self, other):
+        """
+        Equality testing
+        We don't actually care if the list of rules in the assayrule are the same,
+        we just care about the type and values of the rules.
+        """
         return (isinstance(other, type(self)) and 
                 self.assayrule.type == other.assayrule.type and
                 self.assayrule.value == other.assayrule.value)
@@ -85,12 +90,17 @@ class NetAssayMatch(DynamicFilter):
         self.logger.debug("current_min = " + str(current_min))
         return current_min
 
-    def __and__(self, pol):
-        raise MainControlModuleException(self.__class__.__name__+":__and__")
+#    def __and__(self, pol):
+#        raise MainControlModuleException(self.__class__.__name__+":__and__")
 
     def covers(self, other):
         if (other == self):
             return True
+        # FIXME: Go through all the rules in the rule list and see if it would cover
+        # This should not return false positives. What is 'covered' may change
+        # may not matter much, as this will be run again when there's a policy update.
+        # See remove_shadowed_cover_single() in core/classifier.py
+        
         return False
 
 
