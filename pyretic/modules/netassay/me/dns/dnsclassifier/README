@@ -1,0 +1,23 @@
+DNS Classifier
+
+dns_response_parser:
+- Parses a DNS response packet to create ARECORD and CNAME tables
+- Requires domain:application mapping file
+
+ip_to_application_mapping:
+- For any input IP address, spits out domain name and application
+
+DNSClassify (or DNSSpy) module should import Mapper class and define
+a search function which initializes Mapper() and calls
+Mapper.searchType('domain_name_for_which_type_is_needed')
+
+This will return a Service Type which is:
+- VIDEO
+- ADVERT
+- WEB
+- BACKGROUND
+- DEFAULT
+
+These types are saved in servicedef/*.ini as regex strings.
+
+To test Mapper module for some realistic dns responses, run python run_test.py
