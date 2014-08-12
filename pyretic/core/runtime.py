@@ -381,9 +381,9 @@ class Runtime(object):
             :rtype: Classifier
             """
             specialized_rules = []
-            default_vlan_match = match(vlan_id=0xFFFF, vlan_pcp=0)
+            default_vlan_match = Match(dict(vlan_id=0xFFFF, vlan_pcp=0))
             for rule in classifier.rules:
-                if ( ( isinstance(rule.match, match) and
+                if ( ( isinstance(rule.match, Match) and
                        not 'vlan_id' in rule.match.map ) or
                      rule.match == identity ):
                     specialized_rules.append(Rule(rule.match.intersect(default_vlan_match),
@@ -405,13 +405,14 @@ class Runtime(object):
             """
             specialized_rules = []
             # Add a rule that routes the LLDP messages to the controller for topology maintenance.
-            specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
+            specialized_rules.append(Rule(Match(
+                        dict(ethtype=LLDP_TYPE)),[Controller]))
             for rule in classifier.rules:
-                if ( isinstance(rule.match, match) and
+                if ( isinstance(rule.match, Match) and
                      ( 'srcip' in rule.match.map or 
                        'dstip' in rule.match.map ) and 
                      not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
+                    specialized_rules.append(Rule(rule.match & Match(dict(ethtype=IP_TYPE),rule.actions)))
 
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
@@ -422,9 +423,9 @@ class Runtime(object):
                             arp_bug = True
                             break
                     if arp_bug:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[Controller]))
+                        specialized_rules.append(Rule(rule.match & Match(dict(ethtype=ARP_TYPE)),[Controller]))
                     else:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
+                        specialized_rules.append(Rule(rule.match & Match(dict(ethtype=ARP_TYPE)),rule.actions))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -432,18 +433,18 @@ class Runtime(object):
         def layer_4_specialize(classifier):
             specialized_rules = []
             for rule in classifier.rules:
-                if ( isinstance(rule.match, match) and
+                if ( isinstance(rule.match, Match) and
                      ( 'srcport' in rule.match.map or
                        'dstport' in rule.match.map ) and
                      ( not 'ethtype' in rule.match.map or
                        not 'protocol'   in rule.match.map )):
 
                     if 'ethtype' not in rule.match.map:
-                        rule = Rule(rule.match & match(ethtype=IP_TYPE), rule.actions)
+                        rule = Rule(rule.match & Match(dict(ethtype=IP_TYPE)), rule.actions)
 
                     if 'protocol' not in rule.match.map:
                         for proto in [TCP_PROTO, UDP_PROTO]:
-                            specialized_rules.append(Rule(rule.match & match(protocol=proto), rule.actions))
+                            specialized_rules.append(Rule(rule.match & Match(dict(protocol=proto)), rule.actions))
                     else:
                         specialized_rules.append(rule)
                 else:
@@ -535,14 +536,14 @@ class Runtime(object):
             """
             new_rules = list()
             for rule in classifier.rules:
-                if isinstance(rule.match, match) and 'switch' in rule.match.map:
+                if isinstance(rule.match, Match) and 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
                     new_rules.append(rule)
                 else:
                     for s in switches:
                         new_rules.append(Rule(
-                                rule.match.intersect(match(switch=s)),
+                                rule.match.intersect(Match(dict(switch=s))),
                                 rule.actions))
             return Classifier(new_rules)
 
@@ -561,7 +562,7 @@ class Runtime(object):
                         return None
                     elif pred == true:
                         return {}
-                    elif isinstance(pred, match):
+                    elif isinstance(pred, Match):
                         concrete_match = { k:v for (k,v) in pred.map.items() }
                         net_to_str = util.network_to_string
                         for field in ['srcip', 'dstip']:
@@ -820,7 +821,7 @@ class Runtime(object):
                 if m == identity:
                     concrete_pred = {}
                 else:
-                    assert(isinstance(m, match))
+                    assert(isinstance(m, Match))
                     concrete_pred = { k:v for (k,v) in m.map.items() }
                 if 'switch' in concrete_pred:
                     switch_list.append(concrete_pred['switch'])
