@@ -35,7 +35,7 @@ class NetAssayMatch(DynamicFilter):
         listofrules = self.assayrule.get_list_of_rules()
         count = len(listofrules)
         if count == 0:
-            self.policy = drop
+            self.policy = set([])
         else:
             new_policy = listofrules[0]
             for rule in listofrules[1:]:
@@ -58,8 +58,8 @@ class NetAssayMatch(DynamicFilter):
 
     def generate_classifier(self):
         #lovingly stolen from class match.
-        r1 = Rule(self,[identity])
-        r2 = Rule(identity,[drop])
+        r1 = Rule(self,{identity})
+        r2 = Rule(identity,set())
         return Classifier([r1, r2])
 
     def __eq__(self, other):

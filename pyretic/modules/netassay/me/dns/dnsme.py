@@ -43,8 +43,8 @@ class DNSMetadataEngine:
         self.offset = 42 #FIXME! THIS ONLY WORKS WITH IPv4
         dnspkts.register_callback(self._dns_parse_cb)
 
-        dns_inbound = match(srcport = 53) >> dnspkts
-        dns_outbound = match(dstport = 53) >> dnspkts
+        dns_inbound = Match(dict(srcport = 53)) >> dnspkts
+        dns_outbound = Match(dict(dstport = 53)) >> dnspkts
 
         return dns_inbound + dns_outbound
 

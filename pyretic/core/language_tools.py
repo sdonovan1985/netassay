@@ -7,7 +7,9 @@ def ast_fold(fun, acc, policy):
     import pyretic.lib.query as query
     if (  policy == identity or
           policy == drop or
+          policy == set([]) or 
           isinstance(policy,match) or
+          isinstance(policy,Match) or
           isinstance(policy,modify) or
           policy == Controller or
           isinstance(policy,Query)):
@@ -30,7 +32,7 @@ def ast_fold(fun, acc, policy):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(str(policy))
     
 def add_dynamic_sub_pols(acc, policy):
     if isinstance(policy,DynamicPolicy):
@@ -56,6 +58,7 @@ def queries_in_eval(acc, policy):
     elif policy == identity:
         pass
     elif (isinstance(policy,match) or 
+          isinstance(policy,Match) or 
           isinstance(policy,modify) or 
           isinstance(policy,negate)):
         new_pkts = set()
@@ -86,6 +89,7 @@ def on_recompile_path(acc,pol_id,policy):
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
+          isinstance(policy,Match) or
           isinstance(policy,modify) or
           policy == Controller or
           isinstance(policy,Query)):
@@ -112,4 +116,4 @@ def on_recompile_path(acc,pol_id,policy):
             else:
                 return set()
     else:
-        raise NotImplementedError
+        raise NotImplementedError(str(policy))

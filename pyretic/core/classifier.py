@@ -197,9 +197,10 @@ class Classifier(object):
                         new_match_dict[f] = v
                 if len(new_match_dict) == 0:
                     return identity
-                return match(**new_match_dict)
+                return Match(dict(**new_match_dict))
             else:
-                raise TypeError
+                raise TypeError(act.__class__.__name__ + ":" + str(act) + "\n" +
+                                pkts.__class__.__name__ + ":" + str(pkts))
 
         # sequentially compose actions.  a1 must be a
         # single action.  Returns a list of actions.

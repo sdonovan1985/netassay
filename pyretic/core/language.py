@@ -242,7 +242,7 @@ class identity(Singleton):
 
     def __eq__(self, other):
         return ( id(self) == id(other)
-            or ( isinstance(other, match) and len(other.map) == 0) )
+            or ( isinstance(other, Match) and len(other.map) == 0) )
 
     def __repr__(self):
         return "identity"
@@ -297,7 +297,7 @@ class Controller(Singleton):
         return "Controller"
     
 
-class match(Filter):
+class Match(Filter):
     """
     Match on all specified fields.
     Matched packets are kept, non-matched packets are dropped.
@@ -305,10 +305,9 @@ class match(Filter):
     :param *args: field matches in argument format
     :param **kwargs: field matches in keyword-argument format
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, map_dict):
 
-        def _get_processed_map(*args, **kwargs):
-            map_dict = dict(*args, **kwargs)
+        def _get_processed_map(map_dict):
             for field in ['srcip', 'dstip']:
                 try:
                     val = map_dict[field]
@@ -317,11 +316,9 @@ class match(Filter):
                     pass
             return map_dict
 
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
-        self.map = util.frozendict(_get_processed_map(*args, **kwargs))
+        self.map = util.frozendict(_get_processed_map(map_dict))
         self._classifier = self.generate_classifier()
-        super(match,self).__init__()
+        super(Match,self).__init__()
 
     def eval(self, pkt):
         """
@@ -353,11 +350,12 @@ class match(Filter):
         return Classifier([r1, r2])
 
     def __eq__(self, other):
-        return ( (isinstance(other, match) and self.map == other.map)
+        return ( (isinstance(other, Match) and self.map == other.map)
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
-
+        from pyretic.modules.netassay.assaymcm import NetAssayMatch
+        
         def _intersect_ip(ipfx, opfx):
             most_specific = None
             if ipfx in opfx:
@@ -372,8 +370,10 @@ class match(Filter):
             return self
         elif pol == drop:
             return drop
-        elif not isinstance(pol,match):
-            raise TypeError
+        elif isinstance(pol,NetAssayMatch):
+            return pol.intersect(self)
+        elif not isinstance(pol,Match):
+            raise TypeError(str(pol))
         fs1 = set(self.map.keys())
         fs2 = set(pol.map.keys())
         shared = fs1 & fs2
@@ -399,13 +399,13 @@ class match(Filter):
         if most_specific_dst is not None:
             d = d.update({'dstip' : most_specific_dst})
 
-        return match(**d)
+        return Match(dict(**d))
 
     def __and__(self,pol):
-        if isinstance(pol,match):
+        if isinstance(pol,Match):
             return self.intersect(pol)
         else:
-            return super(match,self).__and__(pol)
+            return super(Match,self).__and__(pol)
 
     ### hash : unit -> int
     def __hash__(self):
@@ -433,7 +433,7 @@ class match(Filter):
         return True
 
     def __repr__(self):
-        return "match: %s" % ' '.join(map(str,self.map.items()))
+        return "Match: %s" % ' '.join(map(str,self.map.items()))
 
 
 class modify(Policy):
@@ -664,8 +664,8 @@ class CountBucket(Query):
         matches this bucket is interested in.
         """
         def stat_in_bucket(flow_stat, s):
-            table_match = match(f['match']).intersect(match(switch=s))
-            network_match = match(f['match'])
+            table_match = Match(dict(f['match']).intersect(match(switch=s)))
+            network_match = Match(dict(f['match']))
             if table_match in self.matches or network_match in self.matches:
                 return True
             return False
@@ -1047,7 +1047,7 @@ class xfwd(DerivedPolicy):
     """
     def __init__(self, outport):
         self.outport = outport
-        super(xfwd,self).__init__((~match(inport=outport)) >> fwd(outport))
+        super(xfwd,self).__init__((~Match(dict(inport=outport))) >> fwd(outport))
 
     def __repr__(self):
         return "xfwd %s" % self.outport
@@ -1126,7 +1126,7 @@ class flood(DynamicPolicy):
                 changed = True
         if changed:
             self.policy = parallel([
-                    match(switch=switch) >>
+                    Match(dict(switch=switch)) >>
                         parallel(map(xfwd,attrs['ports'].keys()))
                     for switch,attrs in self.mst.nodes(data=True)])
 
@@ -1150,8 +1150,8 @@ class ingress_network(DynamicFilter):
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       inport=l.port_no)
+            self.policy = parallel([Match(dict(switch=l.switch,
+                                       inport=l.port_no))
                                  for l in self.egresses])
 
     def __repr__(self):
@@ -1171,9 +1171,160 @@ class egress_network(DynamicFilter):
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       outport=l.port_no)
+            self.policy = parallel([Match(dict(switch=l.switch,
+                                       outport=l.port_no))
                                  for l in self.egresses])
 
     def __repr__(self):
         return "egress_network"
+
+
+
+
+# Begin NETASSAY code
+class RegisteredMatchActionsException(Exception):
+    """
+    UPDATED FOR NETASSAY
+    """
+    pass
+
+@singleton
+class RegisteredMatchActions(Singleton):
+    """
+    UPDATED FOR NETASSAY
+    The class that handles the particular attribute must take as its only 
+    parameter in __init__ the value that it's being set to in the match class.
+
+    Example:
+       match(domain='example.com') 
+    The handler for 'domain' matching, say matchDomain, would be initialized as
+    follows:
+       matchDomain('example.com')
+    """
+
+    _registered_matches = {}
+
+    def register(self, attribute, handler):
+        """
+        Registers new classes to handle new attributes.
+        attribute in the above example is 'domain'
+        handler in the above example is the class matchDomain
+        """
+        self._register_matches[attribute] = handler
+
+    def lookup(self, attribute):
+        if attribute not in self._registered_matches.keys():
+            # This is normal. Everything that returns this should be handled by 
+            # the Match class
+            # FIXME - Is this always true?
+            raise RegisteredMatchActionsException(
+                str(attribute) + " not registered")
+        return self._register_matches[attribute]
+
+    def exists(self, attribute):
+        return (attribute in self._registered_matches.keys())
+            
+    
+
+class match(Filter, DerivedPolicy):
+    """
+    UPDATED FOR NETASSAY
+    Replaces old match action, which is now in the Match class.
+    Combines match and NetAssayMatch actions
+
+    Much of the combination logic is based on sequential and intersection 
+    classes above.
+    Some of the other logic is based on Match and Filter. 
+    """
+    def __init__(self, *args, **kwargs):
+        
+        # Need to split the traditional match actions from the new 
+        # NetAssay-based actions
+        self._traditional_match = None
+        self._netassay_match = None
+#        self.policy = None
+
+        map_dict = dict(*args, **kwargs)
+        netassay_match_map = {}
+        traditional_match_map = {}
+
+        for attribute in map_dict.keys():
+            if RegisteredMatchActions.exists(attribute):
+                netassay_match_map[attribute] = map_dict[attribute]
+            else:
+                traditional_match_map[attribute] = map_dict[attribute]
+
+        if len(traditional_match_map.keys()) != 0:
+            # we have a traditional match to deal with. Cache a copy
+            self._traditional_match = Match(traditional_match_map)
+
+        if len(netassay_match_map.keys()) != 0:
+            # build up and cache a copy of the netassay related things.
+            for attribute in netassay_match_map.keys():
+                if new_netassay_match:
+                    new_netassay_match = new_netassay_match >> (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute])
+                else:
+                    new_netassay_match = (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute])
+            self._netassay_match = new_netassay_match
+        
+        if self._traditional_match != None and self._netassay_match != None:
+            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1"
+            self.policy = self._traditional_match >> self._netassay_match
+        elif self._traditional_match == None and self._netassay_match != None:
+            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2"
+            self.policy = self._netassay_match
+        elif self._traditional_match != None and self._netassay_match == None:
+            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 3"
+            self.policy = self._traditional_match
+        else:
+            raise TypeError("Something's wrong here - parsing?")
+
+        self._classifier = self.generate_classifier()
+        super(match,self).__init__()
+
+        print args
+        print kwargs
+        print "self.policy = " + str(self.policy)
+        print "traditional = " + str(self._traditional_match)
+
+    def eval(self, pkt):
+        print "eval"
+        print self.policy.eval(pkt)
+        return self.policy.eval(pkt)
+
+#    def generate_classifier(self):
+#        print "generate_classifier" 
+#        print self.policy.generate_classifier()
+#        return self.policy.generate_classifier()
+
+    def __eq__(self, other):
+        return self.policy.__eq__(other)
+    
+    def intersect(self, pol):
+        print "Intersect"
+        print  self.policy.intersect(pol)
+        return  self.policy.intersect(pol)
+
+    def __and__(self, pol):
+        return self.policy.__and__(pol)
+
+    def __hash__(self, pol):
+        return self.policy.__hash__(pol)
+
+    def __repr__(self):
+        return self.policy.__repr__()
+    
+#    def compile(self):
+#        """
+#        Produce a Classifier for this policy
+#
+#        :rtype: Classifier
+#        """
+#        if NO_CACHE: 
+#            self._classifier = self.generate_classifier()
+#        if not self._classifier:
+#            self._classifier = self.generate_classifier()
+#        return self._classifier
+
+# End NETASSAY code        
+
