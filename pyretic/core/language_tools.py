@@ -7,7 +7,6 @@ def ast_fold(fun, acc, policy):
     import pyretic.lib.query as query
     if (  policy == identity or
           policy == drop or
-          policy == set([]) or 
           isinstance(policy,match) or
           isinstance(policy,Match) or
           isinstance(policy,modify) or

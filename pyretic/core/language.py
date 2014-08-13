@@ -1242,9 +1242,10 @@ class match(Filter, DerivedPolicy):
         # NetAssay-based actions
         self._traditional_match = None
         self._netassay_match = None
-#        self.policy = None
 
         map_dict = dict(*args, **kwargs)
+        super(match,self).__init__()
+
         netassay_match_map = {}
         traditional_match_map = {}
 
@@ -1268,41 +1269,23 @@ class match(Filter, DerivedPolicy):
             self._netassay_match = new_netassay_match
         
         if self._traditional_match != None and self._netassay_match != None:
-            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1"
             self.policy = self._traditional_match >> self._netassay_match
         elif self._traditional_match == None and self._netassay_match != None:
-            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2"
             self.policy = self._netassay_match
         elif self._traditional_match != None and self._netassay_match == None:
-            print "SPD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 3"
             self.policy = self._traditional_match
         else:
             raise TypeError("Something's wrong here - parsing?")
 
         self._classifier = self.generate_classifier()
-        super(match,self).__init__()
-
-        print args
-        print kwargs
-        print "self.policy = " + str(self.policy)
-        print "traditional = " + str(self._traditional_match)
 
     def eval(self, pkt):
-        print "eval"
-        print self.policy.eval(pkt)
         return self.policy.eval(pkt)
-
-#    def generate_classifier(self):
-#        print "generate_classifier" 
-#        print self.policy.generate_classifier()
-#        return self.policy.generate_classifier()
 
     def __eq__(self, other):
         return self.policy.__eq__(other)
     
     def intersect(self, pol):
-        print "Intersect"
-        print  self.policy.intersect(pol)
         return  self.policy.intersect(pol)
 
     def __and__(self, pol):
