@@ -2,7 +2,7 @@
 
 from rv_parser import *
 
-FILENAME = "/home/mininet/pyretic/pyretic/modules/netassay/me/bgp/bgpclassifier/part_of_oix-full-snapshot-2014-06-01-0200"
+FILENAME = "/home/mininet/netassay/pyretic/modules/netassay/me/bgp/bgpclassifier/part_of_oix-full-snapshot-2014-06-01-0200"
 
 # Perhaps this should just be a class that's inherited from... 
 # If so, would need to get rid of the data sources and seperate out the callback

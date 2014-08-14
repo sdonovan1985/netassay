@@ -35,6 +35,7 @@ class NetAssayMatch(DynamicFilter):
         listofrules = self.assayrule.get_list_of_rules()
         count = len(listofrules)
         if count == 0:
+#            self.policy = set([])
             self.policy = drop
         else:
             new_policy = listofrules[0]
@@ -58,8 +59,8 @@ class NetAssayMatch(DynamicFilter):
 
     def generate_classifier(self):
         #lovingly stolen from class match.
-        r1 = Rule(self,[identity])
-        r2 = Rule(identity,[drop])
+        r1 = Rule(self,{identity})
+        r2 = Rule(identity,set())
         return Classifier([r1, r2])
 
     def __eq__(self, other):
@@ -74,21 +75,37 @@ class NetAssayMatch(DynamicFilter):
 
     def intersect(self, pol):
         self.logger.debug("Intersect called")
+        
+        if pol == identity:
+            return self
+        elif pol == drop:
+            return drop
+        elif 0 == len(self.assayrule.get_list_of_rules()):
+            return drop                          
+        elif not (isinstance(pol, NetAssayMatch) or
+                  isinstance(pol, match)):
+            raise TypeError(str(pol.__class__.__name__) + ":" + str(pol))
 
         current_min = identity
-        if isinstance(pol, NetAssayMatch):
+        if isinstance(pol, NetAssaymatch):
+            if 0 == len(pol.assayrule.get_list_of_rules()):
+                return drop
+            
             for rule in pol.assayrule.get_list_of_rules():
                 if current_min == None:
                     current_min = rule
                     continue
-                current_min = rule.intersect(current_min)
+                current_min = current_min.intersect(rule)
         else:
             current_min = pol
 
+        
         for rule in self.assayrule.get_list_of_rules():
-            current_min = rule.intersect(current_min)
+            current_min = current_min.intersect(rule)
+
         self.logger.debug("current_min = " + str(current_min))
         return current_min
+
 
 #    def __and__(self, pol):
 #        raise MainControlModuleException(self.__class__.__name__+":__and__")
