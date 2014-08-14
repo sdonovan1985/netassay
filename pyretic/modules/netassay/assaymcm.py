@@ -17,6 +17,7 @@ class MainControlModuleException(Exception):
 # This is based on match from pyretic.core.langauge
 class NetAssayMatch(DynamicFilter):
     def __init__(self, metadata_engine, ruletype, rulevalue):
+        super(NetAssayMatch,self).__init__()
         loggername = "netassay." + self.__class__.__name__
         logging.getLogger(loggername).info("__init__(): called")
         self.logger = logging.getLogger(loggername)
@@ -26,7 +27,7 @@ class NetAssayMatch(DynamicFilter):
         self.assayrule.set_update_callback(self.update_policy)
         self.me.new_rule(self.assayrule)
         self._classifier = self.generate_classifier()
-        super(NetAssayMatch,self).__init__()
+
         # Just in case there was some initialized values in the rule, 
         # actually use them:
         self.assayrule.finish_rule_group()
@@ -35,12 +36,9 @@ class NetAssayMatch(DynamicFilter):
         listofrules = self.assayrule.get_list_of_rules()
         count = len(listofrules)
         if count == 0:
-#            self.policy = set([])
             self.policy = drop
         else:
-            new_policy = listofrules[0]
-            for rule in listofrules[1:]:
-                new_policy = new_policy | rule
+            new_policy = union(listofrules)
             self.policy = new_policy
             
     
@@ -58,10 +56,11 @@ class NetAssayMatch(DynamicFilter):
         return retval
 
     def generate_classifier(self):
-        #lovingly stolen from class match.
-        r1 = Rule(self,{identity})
-        r2 = Rule(identity,set())
-        return Classifier([r1, r2])
+        return self.policy.compile()
+        if self.policy != None:
+            return self.policy.compile()
+        return drop.compile()
+
 
     def __eq__(self, other):
         """
