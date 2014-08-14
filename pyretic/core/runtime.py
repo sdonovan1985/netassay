@@ -412,7 +412,7 @@ class Runtime(object):
                      ( 'srcip' in rule.match.map or 
                        'dstip' in rule.match.map ) and 
                      not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & Match(dict(ethtype=IP_TYPE),rule.actions)))
+                    specialized_rules.append(Rule(rule.match & Match(dict(ethtype=IP_TYPE)),rule.actions))
 
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
