@@ -87,7 +87,7 @@ class NetAssayMatch(DynamicFilter):
             raise TypeError(str(pol.__class__.__name__) + ":" + str(pol))
 
         current_min = identity
-        if isinstance(pol, NetAssaymatch):
+        if isinstance(pol, NetAssayMatch):
             if 0 == len(pol.assayrule.get_list_of_rules()):
                 return drop
             

@@ -357,7 +357,10 @@ class match(Filter):
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
-
+        #### NETASSAY WORKAROUND ####
+        from pyretic.modules.netassay.assaymcm import NetAssayMatch
+        #### END NETASSAY WORKAROUND ####
+        
         def _intersect_ip(ipfx, opfx):
             most_specific = None
             if ipfx in opfx:
@@ -372,8 +375,12 @@ class match(Filter):
             return self
         elif pol == drop:
             return drop
+        #### NETASSAY WORKAROUND ####
+        elif isinstance(pol,NetAssayMatch):
+            return pol.intersect(self)
+        #### END NETASSAY WORKAROUND ####
         elif not isinstance(pol,match):
-            raise TypeError
+            raise TypeError(str(pol.__class__.__name__) + ":" +str(pol))
         fs1 = set(self.map.keys())
         fs2 = set(pol.map.keys())
         shared = fs1 & fs2
