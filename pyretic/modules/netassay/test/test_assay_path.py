@@ -53,11 +53,11 @@ class TestAssay(DynamicPolicy):
         self.INASs1rules = ((match(switch=1, inport=1) >> fwd(3)) +
                             (match(switch=1, inport=2) >> fwd(3)) +
                             (match(switch=1, inport=3) >> 
-                             if_(matchASPath('7545'), fwd(1), fwd(2))))
+                             if_(match(ASPath='7545'), fwd(1), fwd(2))))
         self.INASs2rules = ((match(switch=2, inport=1) >> fwd(3)) +
                             (match(switch=2, inport=2) >> fwd(3)) +
                             (match(switch=2, inport=3) >>
-                             if_(matchASPath('7545'), fwd(1), fwd(2))))
+                             if_(match(ASPath='7545'), fwd(1), fwd(2))))
         
 
         self.update_policy()

@@ -53,11 +53,11 @@ class TestAssay(DynamicPolicy):
         self.URLs1rules = ((match(switch=1, inport=1) >> fwd(3)) +
                            (match(switch=1, inport=2) >> fwd(3)) +
                            (match(switch=1, inport=3) >> 
-                            if_(matchURL('google.com'), fwd(1), fwd(2))))
+                            if_(match(domain='google.com'), fwd(1), fwd(2))))
         self.URLs2rules = ((match(switch=2, inport=1) >> fwd(3)) +
                            (match(switch=2, inport=2) >> fwd(3)) +
                            (match(switch=2, inport=3) >>
-                            if_(matchURL('google.com'), fwd(1), fwd(2))))
+                            if_(match(domain='google.com'), fwd(1), fwd(2))))
 
         self.update_policy()
 

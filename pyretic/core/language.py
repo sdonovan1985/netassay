@@ -355,7 +355,7 @@ class Match(Filter):
 
     def intersect(self, pol):
         #### NETASSAY WORKAROUND ####
-        from pyretic.modules.netassay.assaymcm import NetAssayMatch
+        from pyretic.modules.netassay.netassaymatch import NetAssayMatch
         #### END NETASSAY WORKAROUND ####
         
         def _intersect_ip(ipfx, opfx):
@@ -1214,7 +1214,7 @@ class RegisteredMatchActions(Singleton):
         attribute in the above example is 'domain'
         handler in the above example is the class matchDomain
         """
-        self._register_matches[attribute] = handler
+        self._registered_matches[attribute] = handler
 
     def lookup(self, attribute):
         if attribute not in self._registered_matches.keys():
@@ -1223,7 +1223,7 @@ class RegisteredMatchActions(Singleton):
             # FIXME - Is this always true?
             raise RegisteredMatchActionsException(
                 str(attribute) + " not registered")
-        return self._register_matches[attribute]
+        return self._registered_matches[attribute]
 
     def exists(self, attribute):
         return (attribute in self._registered_matches.keys())
@@ -1265,23 +1265,26 @@ class match(Filter, DerivedPolicy):
 
         if len(netassay_match_map.keys()) != 0:
             # build up and cache a copy of the netassay related things.
+            new_netassay_match = None
             for attribute in netassay_match_map.keys():
-                if new_netassay_match:
-                    new_netassay_match = new_netassay_match >> (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute])
+                if new_netassay_match != None:
+                    new_netassay_match = new_netassay_match >> (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute], self)
                 else:
-                    new_netassay_match = (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute])
+                    new_netassay_match = (RegisteredMatchActions.lookup(attribute))(netassay_match_map[attribute], self)
             self._netassay_match = new_netassay_match
         
+        self.children_update()
+
+        self._classifier = self.generate_classifier()
+
+
+    def children_update(self):
         if self._traditional_match != None and self._netassay_match != None:
             self.policy = self._traditional_match >> self._netassay_match
         elif self._traditional_match == None and self._netassay_match != None:
             self.policy = self._netassay_match
         elif self._traditional_match != None and self._netassay_match == None:
             self.policy = self._traditional_match
-        else:
-            raise TypeError("Something's wrong here - parsing?")
-
-        self._classifier = self.generate_classifier()
 
     def eval(self, pkt):
         return self.policy.eval(pkt)
@@ -1295,8 +1298,8 @@ class match(Filter, DerivedPolicy):
     def __and__(self, pol):
         return self.policy.__and__(pol)
 
-    def __hash__(self, pol):
-        return self.policy.__hash__(pol)
+#    def __hash__(self, pol):
+#        return self.policy.__hash__(pol)
 
     def __repr__(self):
         return self.policy.__repr__()

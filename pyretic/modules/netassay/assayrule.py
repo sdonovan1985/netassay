@@ -59,7 +59,7 @@ class AssayRule:
 
     def _update_rules(self):
         for cb in self.update_callbacks:
-            self.logger.debug("calling " + str(cb))
+#            self.logger.debug("calling " + str(cb))
             cb()
 
     def get_list_of_rules(self):

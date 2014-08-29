@@ -6,6 +6,7 @@ import logging
 from dnsclassifier.dnsclassify import *
 from dnsentry import DNSClassifierEntry as DNSEntry
 from pyretic.modules.netassay.assayrule import *
+from pyretic.modules.netassay.netassaymatch import *
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
@@ -24,6 +25,10 @@ class DNSMetadataEngine:
         self.classifier = DNSClassifier()
         self.entries = []
         self.logger = logging.getLogger('netassay.DNSME')
+
+        # Register the different actions this ME can handle
+        RegisteredMatchActions.register('domain', matchURL)
+        RegisteredMatchActions.register('class', matchClass)
 
         self.logger.debug("DNSMetadataEngine.__init__(): finished")
 
@@ -114,3 +119,29 @@ class DNSMetadataEntry:
         entry.register_timeout_callback(self.handle_expiration_callback)
 
     
+
+#--------------------------------------
+# NetAssayMatch subclasses
+#--------------------------------------
+
+class matchURL(NetAssayMatch):
+    """
+    matches IPs related to the specified URL.
+    """
+    def __init__(self, url, matchaction):
+        logging.getLogger('netassay.matchURL').info("matchURL.__init__(): called")
+        metadata_engine = DNSMetadataEngine.get_instance()
+        ruletype = AssayRule.DNS_NAME
+        rulevalue = url
+        super(matchURL, self).__init__(metadata_engine, ruletype, rulevalue, matchaction)
+
+class matchClass(NetAssayMatch):
+    """
+    matches IPs related to the specified class of URLs.
+    """
+    def __init__(self, classification, matchaction):
+        logging.getLogger('netassay.matchClass').info("matchURL.__init__(): called")
+        metadata_engine = DNSMetadataEngine.get_instance()
+        ruletype = AssayRule.CLASSIFICATION
+        rulevalue = classification
+        super(matchClass, self).__init__(metadata_engine, ruletype, rulevalue, matchaction)

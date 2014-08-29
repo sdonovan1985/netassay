@@ -6,6 +6,7 @@ import logging
 
 from bgpqueries import BGPQueryHandler as BGPHandler
 from pyretic.modules.netassay.assayrule import *
+from pyretic.modules.netassay.netassaymatch import *
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
@@ -24,6 +25,10 @@ class BGPMetadataEngine:
         self.bgp_source = BGPHandler()
         self.entries = []
         self.logger = logging.getLogger('netassay.BGPME')
+
+        # Register the different actions this ME can handle
+        RegisteredMatchActions.register('AS', matchAS)
+        RegisteredMatchActions.register('ASPath', matchASPath)
 
         self.logger.debug("BGPMetadataEngine.__init__(): finished")
 
@@ -85,3 +90,29 @@ class BGPMetadataEntry:
         self.rule.add_rule_group(Match(dict(srcip=IPPrefix(prefix))))
         self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
 
+
+#--------------------------------------
+# NetAssayMatch subclasses
+#--------------------------------------
+
+class matchAS(NetAssayMatch):
+    """
+    matches IP prefixes related to the specified AS.
+    """
+    def __init__(self, asnum, matchaction):
+        logging.getLogger('netassay.matchAS').info("matchAS.__init__(): called")
+        metadata_engine = BGPMetadataEngine.get_instance()
+        ruletype = AssayRule.AS
+        rulevalue = asnum
+        super(matchAS, self).__init__(metadata_engine, ruletype, rulevalue, matchaction)
+
+class matchASPath(NetAssayMatch):
+    """
+    matches IP prefixes related to the specified AS.
+    """
+    def __init__(self, asnum, matchaction):
+        logging.getLogger('netassay.matchASPath').info("matchASPath.__init__(): called")
+        metadata_engine = BGPMetadataEngine.get_instance()
+        ruletype = AssayRule.AS_IN_PATH
+        rulevalue = asnum
+        super(matchASPath, self).__init__(metadata_engine, ruletype, rulevalue, matchaction)
