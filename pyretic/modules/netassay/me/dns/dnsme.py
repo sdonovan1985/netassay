@@ -7,6 +7,7 @@ from dnsclassifier.dnsclassify import *
 from dnsentry import DNSClassifierEntry as DNSEntry
 from pyretic.modules.netassay.assayrule import *
 from pyretic.modules.netassay.netassaymatch import *
+from pyretic.modules.netassay.me.metadataengine import *
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
@@ -15,22 +16,14 @@ from pyretic.lib.query import *
 class DNSMetadataEngineException(Exception):
     pass
 
-class DNSMetadataEngine:
-    INSTANCE = None        
-    # Singleton! should be initialized by the MCM only!
-    
+class DNSMetadataEngine(MetadataEngine):
     def __init__(self):
-        if self.INSTANCE is not None:
-            raise ValueError("Instance already exists!")
-        self.classifier = DNSClassifier()
-        self.entries = []
-        self.logger = logging.getLogger('netassay.DNSME')
+        super(DNSMetadataEngine, self).__init__(DNSClassifier(), 
+                                                DNSMetadataEntry)
 
         # Register the different actions this ME can handle
         RegisteredMatchActions.register('domain', matchURL)
         RegisteredMatchActions.register('class', matchClass)
-
-        self.logger.debug("DNSMetadataEngine.__init__(): finished")
 
     @classmethod
     def get_instance(cls):
@@ -55,32 +48,23 @@ class DNSMetadataEngine:
 
     def _dns_parse_cb(self, pkt):
         self.logger.info("DNSMetadataEngine._dns_parse_cb(): called")
-        self.classifier.parse_new_DNS(pkt['raw'][self.offset:])
-        #self.classifier.print_entries()
-        
-    def new_rule(self, rule):
-        self.logger.info("DNSMetadataEngine.new_rule(): called")
-        self.entries.append(DNSMetadataEntry(self.classifier, self, rule))
+        self.data_source.parse_new_DNS(pkt['raw'][self.offset:])
+        #self.data_source.print_entries()
 
     
 
-class DNSMetadataEntry:
-    def __init__(self, classifier, engine, rule ):
-        logging.getLogger('netassay.DNSMetadataEntry').info("DNSMetadataEntry.__init__(): called")
-        self.classifier = classifier
-        self.engine = engine
-        self.rule = rule
-        self.logger = logging.getLogger('netassay.DNSMetadataEntry')
+class DNSMetadataEntry(MetadataEntry):
+    def __init__(self, data_source, engine, rule):
+        super(DNSMetadataEntry, self).__init__(data_source, engine, rule)
         
         #register for all the callbacks necessary
         if self.rule.type == AssayRule.CLASSIFICATION:
-            classifier.set_classification_callback(
+            self.data_source.set_classification_callback(
                 self.handle_classification_callback,
                 self.rule.value)
         else:
-            classifier.set_new_callback(self.handle_new_entry_callback)
+            self.data_source.set_new_callback(self.handle_new_entry_callback)
             #FIXME: classification change
-#            classifier.
 
     def handle_expiration_callback(self, addr, entry):
         self.logger.info("DNSMetadataEntry.handle_expiration_callback(): called with " + addr)
@@ -95,7 +79,7 @@ class DNSMetadataEntry:
                 self.logger.debug("    Rule type: CLASSIFICATION")
                 self.rule.add_rule(Match(dict(srcip=IPAddr(addr))))
                 self.rule.add_rule(Match(dict(dstip=IPAddr(addr))))
-                #SPD FIXME TTL TURNED OFF FOR TESTING entry.register_timeout_callback(self.handle_expiration_callback)
+                entry.register_timeout_callback(self.handle_expiration_callback)
 
         elif self.rule.type == AssayRule.AS:
             self.logger.debug("    Rule type: AS")
@@ -108,7 +92,7 @@ class DNSMetadataEntry:
                     self.rule.add_rule(Match(dict(srcip=IPAddr(addr))))
                     self.rule.add_rule(Match(dict(dstip=IPAddr(addr))))
                     self.logger.debug("    New rule for " + name)
-                    #SPD FIXME TTL TURNED OFFF FOR TESTING entry.register_timeout_callback(self.handle_expiration_callback)
+                    entry.register_timeout_callback(self.handle_expiration_callback)
 
     def handle_classification_callback(self, addr, entry):
         # This should only be registered for if you care about a particular 

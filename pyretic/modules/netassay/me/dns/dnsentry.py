@@ -80,7 +80,7 @@ class DNSClassifierEntry:
     def _call_callbacks(self):
         #This is called when it expires.
         for cb in self.timeout_callbacks:
-            cb(self.ip, self)
+            cb(self.IP, self)
 
     def _set_and_start_timer(self):
         time_to_go = self.expiry - datetime.now()

@@ -52,7 +52,7 @@ https://mailman.stanford.edu/pipermail/mininet-discuss/2014-February/003976.html
         # There are multiple links between s1 and s2, a fast and a slow path
 
         # Wire switches
-        self.addLink(s1, s3, port1=1, **fastLinkConfig)
+        self.addLink(s1, s3, port1=1, **slowLinkConfig)
         self.addLink(s1, s4, port1=2, **fastLinkConfig)
         self.addLink(s2, s3, port1=1, **slowLinkConfig)
         self.addLink(s2, s4, port1=2, **fastLinkConfig)

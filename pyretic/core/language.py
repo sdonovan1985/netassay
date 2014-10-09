@@ -1228,9 +1228,72 @@ class RegisteredMatchActions(Singleton):
     def exists(self, attribute):
         return (attribute in self._registered_matches.keys())
             
+
+class match(DynamicFilter):
+    """
+    UPDATED FOR NETASSAY
+    Replaces old match action, which is now in the Match class.
+    Combines match and NetAssayMatch actions
+
+    Much of the combination logic is based on sequential and intersection 
+    classes above.
+    Some of the other logic is based on Match and Filter. 
+    """
+
+    def __init__(self, *args, **kwargs):
+
+        super(match,self).__init__()
+
+        self._traditional_match = None
+        self._netassay_match    = None
+
+        map_dict = dict(*args, **kwargs)
+        
+        traditional_match_params = {}
+        netassay_match_params    = {}
+
+        # Sort out the traditional and netassay params
+        for attribute in map_dict.keys():
+            if RegisteredMatchActions.exists(attribute):
+                netassay_match_params[attribute] = map_dict[attribute]
+            else:
+                traditional_match_params[attribute] = map_dict[attribute]
+
+        # get the values full
+        if len(traditional_match_params.keys()) != 0:
+            self._traditional_match = Match(traditional_match_params)
+            
+        if len(netassay_match_params.keys()) != 0:
+            for attribute in netassay_match_params.keys():
+                if self._netassay_match is None:
+                    self._netassay_match = (RegisteredMatchActions.lookup(attribute))(netassay_match_params[attribute], self)
+
+        self.children_update()
+
+    def children_update(self):
+        self.policy = drop
+
+        if ((self._traditional_match is not None) and
+            (self._netassay_match is None)):
+            self.policy = self._traditional_match
+        elif ((self._traditional_match is None) and
+              (self._netassay_match is not None)):
+            self.policy = self._netassay_match
+        elif ((self._traditional_match is not None) and
+              (self._netassay_match is not None)):
+            self.policy = self._traditional_match >> self._netassay_match
+        else:
+            drop
+        #self._classifier = self.generate_classifier
+        print self
+
+    def __repr__(self):
+        return self.policy.__repr__()
+
+            
     
 
-class match(Filter, DerivedPolicy):
+class match_old(DynamicFilter):#, DerivedPolicy):
     """
     UPDATED FOR NETASSAY
     Replaces old match action, which is now in the Match class.
@@ -1275,9 +1338,6 @@ class match(Filter, DerivedPolicy):
         
         self.children_update()
 
-        self._classifier = self.generate_classifier()
-
-
     def children_update(self):
         if self._traditional_match != None and self._netassay_match != None:
             self.policy = self._traditional_match >> self._netassay_match
@@ -1285,6 +1345,7 @@ class match(Filter, DerivedPolicy):
             self.policy = self._netassay_match
         elif self._traditional_match != None and self._netassay_match == None:
             self.policy = self._traditional_match
+        self._classifier = self.generate_classifier()
 
     def eval(self, pkt):
         return self.policy.eval(pkt)
