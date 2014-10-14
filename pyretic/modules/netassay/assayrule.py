@@ -86,14 +86,40 @@ class AssayRule:
         self._update_rules()
         
     def has_rule(self, newrule):
-        return newrule in self._rule_list
+        # In expected order of being true. Please rearrange as appropriate.
+        return ((newrule in self.raw_srcip_rules) |
+                (newrule in self.raw_dstip_rules) |
+                (newrule in self.raw_srcmac_rules) |
+                (newrule in self.raw_dstmac_rules) |
+                (newrule in self.raw_srcport_rules) |
+                (newrule in self.raw_dstport_rules) |
+                (newrule in self.raw_protocol_rules) |
+                (newrule in self.raw_other_rules))
 
     def remove_rule(self, newrule):
-        self._rule_list.remove(newrule)
+        # Shortcut function. Likely the most commonly used one.
+        self._remove_rule_group(self, newrule)
         self._update_rules()           
     
     def remove_rule_group(self, newrule):
-        self._rule_list.remove(newrule)
+        # See has_rule for ordering decision.
+        if newrule in self.raw_srcip_rules:
+            self._raw_srcip_rules.remove(newrule)
+        elif newrule in self.raw_dstip_rules:
+            self._raw_dstip_rules.remove(newrule)
+        elif newrule in self.raw_srcmac_rules:
+            self._raw_srcmac_rules.remove(newrule)
+        elif newrule in self.raw_dstmac_rules:
+            self._raw_dstmac_rules.remove(newrule)
+        elif newrule in self.raw_srcport_rules:
+            self._raw_srcport_rules.remove(newrule)
+        elif newrule in self.raw_dstport_rules:
+            self._raw_dstport_rules.remove(newrule)
+        elif newrule in self.raw_protocol_rules:
+            self._raw_protocol_rules.remove(newrule)
+        elif newrule in self.raw_other_rules:
+            self._raw_other_rules.remove(newrule)
+
 
     def _update_rules(self):
         # check if rules have changed
