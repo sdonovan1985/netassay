@@ -3,7 +3,7 @@
 
 import logging
 from ipaddr import IPv4Network
-from pyretic.core.language import Match
+from pyretic.core.language import Match, basic_headers, tagging_headers
 
 
 class AssayRule:
@@ -63,6 +63,10 @@ class AssayRule:
                     self._raw_srcmac_rules.append(newrule)
                 elif (key == 'dstmac'):
                     self._raw_dstmac_rules.append(newrule)
+                elif (key == 'srcport'):
+                    self._raw_srcport_rules.append(newrule)
+                elif (key == 'dstport'):
+                    self._raw_dstport_rules.append(newrule)
                 elif (key == 'srcip'):
                     self._raw_srcip_rules.append(newrule)
                 elif (key == 'dstip'):
@@ -110,9 +114,6 @@ class AssayRule:
         temp_rule_list = []
         
         # Append non-optimized rules, remove dupes
-        for rule in self._raw_other_rules:
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
         for rule in self._raw_protocol_rules:
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
@@ -129,16 +130,26 @@ class AssayRule:
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
 
+#        for rule in self._raw_other_rules:
+#            if rule not in temp_rule_list:
+#                temp_rule_list.append(rule)
+
+
         # Optimized rules 
         # ipaddr documentation: https://code.google.com/p/ipaddr-py/wiki/Using3144
-        # 
         def optimize_ip(rule_list, ip_rule_list, src_or_dst):
+            to_remove_list = []
             temp_ip_rules = sorted(ip_rule_list, key=lambda ad: ad.map[src_or_dst].prefixlen)
             for rule in temp_ip_rules:
                 # +1 is to skip the current rule...
                 for interior_rule in temp_ip_rules[temp_ip_rules.index(rule)+1:]:
                     if interior_rule.map[src_or_dst] in rule.map[src_or_dst]:
-                        temp_ip_rules.remove(interior_rule)
+                        to_remove_list.append(interior_rule)
+                        break
+
+            for rule in to_remove_list:
+                temp_ip_rules.remove(rule)
+
             for rule in temp_ip_rules:
                 if rule not in rule_list:
                     rule_list.append(rule)
@@ -146,7 +157,81 @@ class AssayRule:
         optimize_ip(temp_rule_list, self._raw_srcip_rules, 'srcip')
         optimize_ip(temp_rule_list, self._raw_dstip_rules, 'dstip')
 
+        # Optimizing others - function may be useful outside of here.
+        def optimize_others(rule_list, other_rule_list):
+            headers =  ['srcmac','dstmac','srcport','dstport',
+                        'ethtype','protocol','tos']
+            ips = ['srcip','dstip']
 
+            temp_other_rules = list(other_rule_list)
+
+            # Separate out the IP related rules
+            temp_srcip_rules = []
+            temp_dstip_rules = []
+            to_remove_list = []
+
+            # First pass is pretty easy, doesn't handle IP addresses
+            for rule in temp_other_rules:
+                for header in headers:
+                    if header in rule.map.keys():
+                        to_check = Match({header : rule.map[header]})
+                        if to_check in rule_list:
+                            to_remove_list.append(rule)
+                            break
+            for rule in to_remove_list:
+                temp_other_rules.remove(rule)
+
+
+            # Second pass handles IPs. These are different, only because they
+            # can easily be subsumed by prefixes.
+            for rule in temp_other_rules:
+                if 'srcip' in rule.map.keys():
+                    temp_srcip_rules.append(rule)
+                elif 'dstip' in rule.map.keys():
+                    temp_srcip_rules.append(rule)
+            for rule in temp_srcip_rules:
+                temp_other_rules.remove(rule)
+            for rule in temp_dstip_rules:
+                temp_other_rules.remove(rule)
+
+
+            temp_srcip_rules = sorted(temp_srcip_rules, key=lambda ad: ad.map['srcip'].prefixlen)
+            temp_dstip_rules = sorted(temp_dstip_rules, key=lambda ad: ad.map['dstip'].prefixlen)
+
+            to_remove_list = []
+            for rule in temp_srcip_rules:
+                for existing_rule in rule_list:
+                    if 'srcip' in existing_rule.map.keys():
+                        if rule.map['srcip'] in existing_rule.map['srcip']:
+                            to_remove_list.append(rule)
+                            break
+
+            for rule in to_remove_list:
+                temp_srcip_rules.remove(rule)
+
+            to_remove_list = []
+            for rule in temp_dstip_rules:
+                for existing_rule in rule_list:
+                    if 'dstip' in existing_rule.map.keys():
+                        if rule.map['dstip'] in existing_rule.map['dstip']:
+                            to_remove_list.append(rule)
+                            break
+            for rule in to_remove_list:
+                temp_dstip_rules.remove(rule)
+
+
+
+            for rule in temp_other_rules:
+                if rule not in rule_list:
+                    rule_list.append(rule)
+            for rule in temp_srcip_rules:
+                if rule not in rule_list:
+                    rule_list.append(rule)
+            for rule in temp_dstip_rules:
+                if rule not in rule_list:
+                    rule_list.append(rule)
+
+        optimize_others(temp_rule_list, self._raw_other_rules)
 
         return temp_rule_list
 
@@ -219,28 +304,49 @@ if __name__ == "__main__":
 
     # Remove duplicates test
     dupe = AssayRule(AssayRule.DNS_NAME, 'dummy')
-    dupe.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    dupe.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    dupe.add_rule(Match(dict(dstip=IPAddr("1.2.3.4"))))
-    dupe.add_rule(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
-    dupe.add_rule(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
+    dupe.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    dupe.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    dupe.add_rule_group(Match(dict(dstip=IPAddr("1.2.3.4"))))
+    dupe.add_rule_group(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
+    dupe.add_rule_group(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
+
 
     print "DUPLICATES TEST BEGIN"
+    dupe.finish_rule_group()
     dupe._display_for_testing()
     print "DUPLICATES TEST END"
     print ""
     
-
-
     # IP Optimization
     optimization = AssayRule(AssayRule.DNS_NAME, 'dummy')
-    optimization.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    optimization.add_rule(Match(dict(srcip=IPv4Network("1.2.3.0/24"))))
+    optimization.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("1.2.3.0/24"))))
 
-    optimization.add_rule(Match(dict(srcip=IPv4Network("2.3.4.0/24"))))
-    optimization.add_rule(Match(dict(srcip=IPv4Network("2.3.0.0/16"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.4.0/24"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.0.0/16"))))
 
 
     print "IP OPTIMIZATION TEST BEGIN"
+    optimization.finish_rule_group()
     optimization._display_for_testing()
     print "IP OPTIMIZATION TEST END"
+    print ""
+
+
+    # Others optimization
+    others = AssayRule(AssayRule.DNS_NAME, 'dummy')
+    others.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    others.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"),srcport='1234')))
+
+    others.add_rule_group(Match(dict(srcip=IPAddr("2.3.4.5"))))
+    others.add_rule_group(Match(dict(srcport='2345')))
+    others.add_rule_group(Match(dict(srcip=IPAddr("2.3.4.5"),srcport='2345')))
+
+    others.add_rule_group(Match(dict(srcip=IPv4Network("3.4.5.0/16"))))
+    others.add_rule_group(Match(dict(srcip=IPAddr("3.4.5.6"),srcport='2345')))
+
+
+    print "OTHERS OPTIMIZATION TEST BEGIN"
+    others.finish_rule_group()
+    others._display_for_testing()
+    print "OTHERS OPTIMIZATION TEST END"
