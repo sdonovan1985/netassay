@@ -2,7 +2,7 @@
 # This defines rules for NetAssay.
 
 import logging
-from ipaddr import IPv4Network
+from ipaddr import IPv4Network, CollapseAddrList
 from pyretic.core.language import Match, basic_headers, tagging_headers
 
 
@@ -179,9 +179,23 @@ class AssayRule:
             for rule in temp_ip_rules:
                 if rule not in rule_list:
                     rule_list.append(rule)
-        
-        optimize_ip(temp_rule_list, self._raw_srcip_rules, 'srcip')
-        optimize_ip(temp_rule_list, self._raw_dstip_rules, 'dstip')
+
+        # This is a replacement for optimize_ip(), but I'm leaving the other
+        # just in case the old one is faster.
+        def optimize_ip_prefix(rule_list, ip_rule_list, src_or_dst):
+            prefix_list = []
+            for rule in ip_rule_list:
+                prefix_list.append(rule.map[src_or_dst])
+
+            for prefix in CollapseAddrList(prefix_list):
+                rule_list.append(Match({src_or_dst: prefix}))           
+            
+
+#        optimize_ip(temp_rule_list, self._raw_srcip_rules, 'srcip')
+#        optimize_ip(temp_rule_list, self._raw_dstip_rules, 'dstip')
+        optimize_ip_prefix(temp_rule_list, self._raw_srcip_rules, 'srcip')
+        optimize_ip_prefix(temp_rule_list, self._raw_dstip_rules, 'dstip')
+
 
         # Optimizing others - function may be useful outside of here.
         def optimize_others(rule_list, other_rule_list):
@@ -350,6 +364,13 @@ if __name__ == "__main__":
 
     optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.4.0/24"))))
     optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.0.0/16"))))
+
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("3.2.0.0/16"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("3.3.0.0/16"))))
+
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.2.0.0/16"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.3.0.0/16"))))
+    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.3.4.0/24"))))
 
 
     print "IP OPTIMIZATION TEST BEGIN"
