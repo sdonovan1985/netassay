@@ -36,6 +36,7 @@ import struct
 import time
 from ipaddr import IPv4Network
 from bitarray import bitarray
+import copy
 
 from pyretic.core import util
 from pyretic.core.network import *
@@ -43,8 +44,21 @@ from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
+from multiprocessing import Process
+from multiprocessing import Manager
+from multiprocessing import cpu_count
+from multiprocessing import Queue
+
 
 NO_CACHE=False
+compile_debug = False
+use_disjoint_cache = True
+
+manager = Manager()
+disjoint_cache_shr = manager.dict()
+
+disjoint_cache={}
+
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
@@ -53,6 +67,7 @@ native_headers = basic_headers + tagging_headers
 location_headers = ["switch", "inport", "outport"]
 compilable_headers = native_headers + location_headers
 content_headers = [ "raw", "header_len", "payload_len"]
+
 
 ################################################################################
 # Policy Language                                                              #
@@ -804,6 +819,229 @@ class parallel(CombinatorPolicy):
             return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
         return reduce(lambda acc, c: acc + c, classifiers)
+    
+
+class disjoint(CombinatorPolicy):
+    """
+    Combinator for several disjoint policies.
+
+    :param policies: the policies to be combined.
+    :type policies: list Policy
+    """
+    def __new__(self, policies=[]):
+        # Hackety hack.
+        if len(policies) == 0:
+            return identity
+        else:
+            rv = super(disjoint, self).__new__(disjoint, policies)
+            rv.__init__(policies)
+            return rv
+
+    def __init__(self, policies=[]):
+        if len(policies) == 0:
+            raise TypeError
+        super(disjoint, self).__init__(policies)
+        
+    def eval(self, pkt):
+        """
+        evaluates to the set union of the evaluation
+        of self.policies on pkt
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        # Very similar to Parallel, only difference that it will only have one output pkt.
+        # Todo: Assert that it return only one packet as output
+        output = set()
+        for policy in self.policies:
+            output |= (policy.eval(pkt))
+        #print self.policies, pkt
+        
+        #print output
+        return output
+    
+    def compile(self, do_mp=False):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        #print "lower policies: ",self.lower
+        if compile_debug==True: 
+            print "Disjoint Policies compiler called: ",len(self.policies)
+        start=time.time()
+   
+        # Make sure that there are policies to compile
+        assert(len(self.policies) > 0)
+        aggr_rules=[]
+        last_rule=None       
+
+        ## Processes will store return values here (Synchronized with lock)
+        job_returns = Queue()
+        last_rule_entry = manager.list()
+        last_rule_entry.append(None)
+        from multiprocessing import Lock
+        djLock = Lock()
+
+        global disjoint_cache 
+        # Processes list
+        jobs = []
+
+#        from multiprocessing import Pool
+        from multiprocessing import cpu_count
+#        pool = Pool(processes=cpu_count())    
+        do_multi_process = do_mp
+
+
+        # Spawn processes based on number of CPUs
+        if do_multi_process is True:
+            start_time = time.time()
+            if len(self.policies) < 1000:
+                batch = 1000
+            else: 
+                batch = len(self.policies) / cpu_count()
+            nProc = len(self.policies) / batch
+            last_end = 0
+            for n in range(nProc):
+                start = n*batch
+                end = (n+1)*batch
+                last_end = end
+                policy_list = self.policies[start:end]
+                
+                p=Process(target=self.mp_for_each_policy,\
+                          args=(djLock,policy_list,job_returns,disjoint_cache_shr,last_rule_entry))
+                p.start()
+                jobs.append(p)
+
+
+            # Wait until done
+#            for j in jobs:
+#                j.join()
+            while job_returns.qsize()!=nProc:
+                continue
+
+            disjoint_cache = copy.deepcopy(disjoint_cache_shr)
+
+            # Create aggr_rules from all returned lists
+            while not job_returns.empty():
+                try:
+                    elem = job_returns.get()
+                    aggr_rules+=elem
+                except:
+                    print 'Exception'
+ 
+            # Remaining   
+            if len(self.policies)-nProc*batch <= 0:
+                policy_list = self.policies[last_end:(len(self.policies)-nProc*batch)]
+                this_aggr_list, last_rule = self.do_each_sequentially(policy_list)
+
+                this_aggr_list+=last_rule
+                aggr_rules+=str(this_aggr_list)
+
+            else:
+                if last_rule_entry[0] != None:        
+                    aggr_rules+=str(last_rule_entry[0])
+  
+        else:
+            start_time = time.time()
+            aggr_rules, last_rule = self.do_each_sequentially(self.policies)
+            aggr_rules+=last_rule 
+
+        if compile_debug==True: 
+            print "Time to compile disjoint policies: ",time.time()-start_time
+        start_time=time.time()
+        classifiers=aggr_rules  
+ 
+        #print "Cache state: ", disjoint_cache    
+        return classifiers
+
+    def do_each_sequentially_for_mp(self,policy_list,disjoint_cache_shr,djLock):
+        aggr_rules = []
+        tmp_rule_list = []
+        last_rule = [None,]
+        print "Policy List Length:",len(policy_list)
+        for policy in policy_list:
+            start1 = time.time()
+            tmp_rule_list = []
+            
+            if use_disjoint_cache:
+                hash_d = policy.__repr__()
+                if hash_d in disjoint_cache_shr:
+                    tmp_rules=disjoint_cache_shr[hash_d]
+#                    print 'HIT'
+                else:
+#                    print 'MISS in MP'
+                    tmp_rules=policy.compile().rules
+                    disjoint_cache_shr[hash_d]=str(tmp_rules)
+            else:                      
+                tmp_rules=policy.compile().rules  
+                                                
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            
+            ctr = 0
+            for obj in tmp_rules:
+                
+                if ctr == len(tmp_rules)-1:
+                    break
+                else:
+                    tmp_rule_list.append(obj)
+                    ctr += 1
+                    
+            aggr_rules+=tmp_rule_list                 
+#            print 'Time!!!:',time.time() - start1
+
+        return aggr_rules,last_rule
+
+
+    def do_each_sequentially(self,policy_list):
+        aggr_rules = []
+        tmp_rule_list = []
+        last_rule = [None,]
+        print "Policy List Length SP:",len(policy_list)
+        for policy in policy_list:
+            start1 = time.time()
+            tmp_rule_list = []
+            
+            if use_disjoint_cache:
+                hash_d = policy.__repr__()
+                if hash_d in disjoint_cache:
+                    tmp_rules=disjoint_cache[hash_d]
+                else:
+#                    print 'MISS in SP'
+                    tmp_rules=policy.compile().rules
+                    disjoint_cache[hash_d]=tmp_rules  
+            else:                      
+                tmp_rules=policy.compile().rules  
+                                                
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            
+            ctr = 0
+            for obj in tmp_rules:
+                
+                if ctr == len(tmp_rules)-1:
+                    break
+                else:
+                    tmp_rule_list.append(obj)
+                    ctr += 1
+                    
+            aggr_rules+=tmp_rule_list                 
+#            print 'Time!!!:',time.time() - start1
+
+        return aggr_rules,last_rule
+
+    def mp_for_each_policy(self, djLock,policy_list,job_returns,disjoint_cache_shr,last_rule_entry):
+        
+        this_aggr_list,last_rule = self.do_each_sequentially_for_mp(policy_list,disjoint_cache_shr,djLock)
+
+        job_returns.put(str(this_aggr_list))
+        last_rule_entry[0] = str(last_rule)
+
+#        with djLock:
+#            job_returns.put(str(this_aggr_list))
+#            last_rule_entry[0] = str(last_rule)
+#            pass
+ 
 
 
 class union(parallel,Filter):

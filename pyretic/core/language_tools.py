@@ -17,7 +17,8 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,parallel) or
           isinstance(policy,union) or
           isinstance(policy,sequential) or
-          isinstance(policy,intersection)):
+          isinstance(policy,intersection) or
+          isinstance(policy,disjoint)):
         acc = fun(acc,policy)
         for sub_policy in policy.policies:
             acc = ast_fold(fun,acc,sub_policy)
@@ -97,6 +98,7 @@ def on_recompile_path(acc,pol_id,policy):
           isinstance(policy,parallel) or
           isinstance(policy,union) or
           isinstance(policy,sequential) or
+          isinstance(policy,disjoint) or
           isinstance(policy,intersection)):
         sub_acc = set()
         for sub_policy in policy.policies:
