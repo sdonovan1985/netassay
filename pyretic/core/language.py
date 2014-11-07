@@ -53,11 +53,15 @@ from multiprocessing import Queue
 NO_CACHE=False
 compile_debug = False
 use_disjoint_cache = True
+use_parallel_cache = True
+use_sequential_cache = True
 
 manager = Manager()
 disjoint_cache_shr = manager.dict()
 
 disjoint_cache={}
+parallel_cache={}
+sequential_cache={}
 
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
@@ -815,10 +819,36 @@ class parallel(CombinatorPolicy):
         return output
 
     def generate_classifier(self):
-        if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
-            return drop.compile()
-        classifiers = map(lambda p: p.compile(), self.policies)
-        return reduce(lambda acc, c: acc + c, classifiers)
+        """
+        Adapted from the SDX modification for caching found:
+        https://github.com/sdn-ixp/sdx-platform-optimized/blob/sigcomm/pyretic/core/language.py
+        """
+
+        if use_parallel_cache == True:
+            classifier_temp=[]
+            
+            for policy1 in self.policies:
+                hash1 = policy1.__repr__()
+                
+                if hash1 in parallel_cache:
+                    out = parallel_cache[hash1]
+                    classifier_temp.append(out)
+                else:
+                    out = policy1.compile()
+                    classifier_temp.append(out)
+                    parallel_cache[hash1] = out
+
+
+            if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
+                return drop.compile()
+            classifiers = classifier_temp
+        else
+            if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
+                return drop.compile()
+            classifiers = map(lambda p: p.compile(), self.policies)
+
+        out = reduce(lambda acc, c: acc + c, classifiers)
+        return out
     
 
 class disjoint(CombinatorPolicy):
@@ -861,7 +891,8 @@ class disjoint(CombinatorPolicy):
         #print output
         return output
     
-    def compile(self, do_mp=False):
+#    def compile(self, do_mp=False):
+    def generate_classifier(self, do_mp=False):
         """
         Produce a Classifier for this policy
 
@@ -1129,11 +1160,36 @@ class sequential(CombinatorPolicy):
         return output
 
     def generate_classifier(self):
-        assert(len(self.policies) > 0)
-        classifiers = map(lambda p: p.compile(),self.policies)
+        """
+        Adapted from the SDX modification for caching found:
+        https://github.com/sdn-ixp/sdx-platform-optimized/blob/sigcomm/pyretic/core/language.py
+        """
+
+        if use_sequential_cache == True:
+            classifier_temp = []
+            
+            for policy1 in self.policies:
+                hash1 = policy1.__repr__()
+
+                if hash1 in sequential_cache:
+                    out = sequential_cache[hash1]
+                    classifier_temp.append(out)
+                else:
+                    out = policy1.compile()
+                    classifier_temp.append(out)
+                    sequential_cache[hash1] = out
+
+            assert(len(self.policies) > 0)
+            classifiers = classifier_temp
+
+        else:
+            assert(len(self.policies) > 0)
+            classifiers = map(lambda p: p.compile(),self.policies)
+
         for c in classifiers:
             assert(c is not None)
-        return reduce(lambda acc, c: acc >> c, classifiers)
+        out = reduce(lambda acc, c: acc >> c, classifiers)
+        return out
         
 
 class intersection(sequential,Filter):
