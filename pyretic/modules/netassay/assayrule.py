@@ -87,37 +87,37 @@ class AssayRule:
         
     def has_rule(self, newrule):
         # In expected order of being true. Please rearrange as appropriate.
-        return ((newrule in self.raw_srcip_rules) |
-                (newrule in self.raw_dstip_rules) |
-                (newrule in self.raw_srcmac_rules) |
-                (newrule in self.raw_dstmac_rules) |
-                (newrule in self.raw_srcport_rules) |
-                (newrule in self.raw_dstport_rules) |
-                (newrule in self.raw_protocol_rules) |
-                (newrule in self.raw_other_rules))
+        return ((newrule in self._raw_srcip_rules) |
+                (newrule in self._raw_dstip_rules) |
+                (newrule in self._raw_srcmac_rules) |
+                (newrule in self._raw_dstmac_rules) |
+                (newrule in self._raw_srcport_rules) |
+                (newrule in self._raw_dstport_rules) |
+                (newrule in self._raw_protocol_rules) |
+                (newrule in self._raw_other_rules))
 
     def remove_rule(self, newrule):
         # Shortcut function. Likely the most commonly used one.
-        self._remove_rule_group(self, newrule)
+        self.remove_rule_group(newrule)
         self._update_rules()           
     
     def remove_rule_group(self, newrule):
         # See has_rule for ordering decision.
-        if newrule in self.raw_srcip_rules:
+        if newrule in self._raw_srcip_rules:
             self._raw_srcip_rules.remove(newrule)
-        elif newrule in self.raw_dstip_rules:
+        elif newrule in self._raw_dstip_rules:
             self._raw_dstip_rules.remove(newrule)
-        elif newrule in self.raw_srcmac_rules:
+        elif newrule in self._raw_srcmac_rules:
             self._raw_srcmac_rules.remove(newrule)
-        elif newrule in self.raw_dstmac_rules:
+        elif newrule in self._raw_dstmac_rules:
             self._raw_dstmac_rules.remove(newrule)
-        elif newrule in self.raw_srcport_rules:
+        elif newrule in self._raw_srcport_rules:
             self._raw_srcport_rules.remove(newrule)
-        elif newrule in self.raw_dstport_rules:
+        elif newrule in self._raw_dstport_rules:
             self._raw_dstport_rules.remove(newrule)
-        elif newrule in self.raw_protocol_rules:
+        elif newrule in self._raw_protocol_rules:
             self._raw_protocol_rules.remove(newrule)
-        elif newrule in self.raw_other_rules:
+        elif newrule in self._raw_other_rules:
             self._raw_other_rules.remove(newrule)
 
 

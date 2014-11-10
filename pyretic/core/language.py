@@ -842,7 +842,7 @@ class parallel(CombinatorPolicy):
             if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
                 return drop.compile()
             classifiers = classifier_temp
-        else
+        else:
             if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
                 return drop.compile()
             classifiers = map(lambda p: p.compile(), self.policies)
