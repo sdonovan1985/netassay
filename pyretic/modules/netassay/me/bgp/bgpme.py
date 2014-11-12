@@ -75,19 +75,19 @@ class BGPMetadataEntry:
         if self.rule.type == AssayRule.AS:
             new_prefixes = self.bgp_source.query_from_AS(self.rule.value)
             for prefix in new_prefixes:
-                self.rule.add_rule_group(Match(dict(srcip=IPPrefix(prefix))))
-                self.rule.add_rule_group(Match(dict(dstip=IPPrefix(prefix))))
+                self.rule.add_rule(Match(dict(srcip=IPPrefix(prefix))))
+                self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
         elif self.rule.type == AssayRule.AS_IN_PATH:
             new_prefixes = self.bgp_source.query_in_path(self.rule.value)
             for prefix in new_prefixes:
-                self.rule.add_rule_group(Match(dict(srcip=IPPrefix(prefix))))
-                self.rule.add_rule_group(Match(dict(dstip=IPPrefix(prefix))))
+                self.rule.add_rule(Match(dict(srcip=IPPrefix(prefix))))
+                self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
 
         #TODO: need to handle withdrawals!
 
     def handle_AS_callback(self, prefix):
         self.logger.info("BGPMetatdataEntry.handle_AS_callback(): called with prfix " + prefix)
-        self.rule.add_rule_group(Match(dict(srcip=IPPrefix(prefix))))
+        self.rule.add_rule(Match(dict(srcip=IPPrefix(prefix))))
         self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
 
 

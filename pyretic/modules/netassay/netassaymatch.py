@@ -25,10 +25,6 @@ class NetAssayMatch(DynamicFilter):
         self._classifier = self.generate_classifier()
         self.matchaction = matchaction
 
-        # Just in case there was some initialized values in the rule, 
-        # actually use them:
-        self.assayrule.finish_rule_group()
-
     def update_policy(self):
         listofrules = self.assayrule.get_list_of_rules()
         count = len(listofrules)

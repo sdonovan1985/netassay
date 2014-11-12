@@ -4,7 +4,9 @@
 import logging
 from ipaddr import IPv4Network, CollapseAddrList
 from pyretic.core.language import Match, basic_headers, tagging_headers
+from threading import Timer
 
+TIMEOUT = 0.1
 
 class AssayRule:
     # Ruletypes!
@@ -41,17 +43,57 @@ class AssayRule:
         self._raw_other_rules = []
         self._rule_list = []
 
+        # Timer and timer related - one timer for both add and remove
+        self._timer = None
+        self._rules_to_add = []
+        self._rules_to_remove = []
+
 
     def set_update_callback(self, cb):
         # These callbacks take an AssayRule as input
         self.update_callbacks.append(cb)
 
-    def add_rule(self, newrule):
-        # Shortcut function. Likely the most commonly used one.
-        self.add_rule_group(newrule)
-        self._update_rules()
+    def _rule_timer(self):
+        self.logger.debug("_rule_timer() called, addsize: " + str(len(self._rules_to_add)))
+        self.logger.debug("                  lremovesize: " + str(len(self._rules_to_remove)))
+#        self.logger.debug("    _rules_to_add:    " + str(self._rules_to_add))
+#        self.logger.debug("    _rules_to_remove: " + str(self._rules_to_remove))
 
-    def add_rule_group(self, newrule):
+        # Stop the running delay timer
+        if self._timer is not None:
+            self.logger.debug("    cancelling timer")
+            self._timer.cancel()
+            self._timer = None
+            self.logger.debug("    cancelled timer: " + str(self._timer))
+
+        for rule in self._rules_to_add:
+            self.logger.debug("  Adding   " + str(rule))
+            self._install_rule(rule)
+        for rule in self._rules_to_remove:
+            self.logger.debug("  Removing " + str(rule))
+            self._uninstall_rule(rule)
+        self._rules_to_add = []
+        self._rules_to_remove = []
+        self._update_rules()
+        
+    def add_rule(self, newrule, nodelay=False):
+        self.logger.debug("add_rule: timer - " + str(self._timer))
+
+        if (nodelay == True):
+            self._install_rule(newrule)
+            self._update_rules()
+            self.logger.debug("    nodelay == True")
+
+        else:
+            self._rules_to_add.append(newrule)
+#            self.logger.debug("    new rule: " + str(newrule))
+#            self.logger.debug("    rules in queue: " + str(self._rules_to_add))
+            if self._timer is None:
+                self._timer = Timer(TIMEOUT, self._rule_timer)
+                self._timer.start()
+                self.logger.debug("    new timer   - " + str(self._timer))
+
+    def _install_rule(self, newrule):
         # Does not check to see if it's a duplicate rule, as this allows the 
         # same rule to be installed for different reasons, and they can be 
         # removed individually.
@@ -80,11 +122,7 @@ class AssayRule:
         else:
             self._raw_other_rules.append(newrule)
 
-        # FIXME: Kick off a timer just in case the group isn't finished correctly?
 
-    def finish_rule_group(self):
-        self._update_rules()
-        
     def has_rule(self, newrule):
         # In expected order of being true. Please rearrange as appropriate.
         return ((newrule in self._raw_srcip_rules) |
@@ -96,12 +134,24 @@ class AssayRule:
                 (newrule in self._raw_protocol_rules) |
                 (newrule in self._raw_other_rules))
 
-    def remove_rule(self, newrule):
-        # Shortcut function. Likely the most commonly used one.
-        self.remove_rule_group(newrule)
-        self._update_rules()           
-    
-    def remove_rule_group(self, newrule):
+    def remove_rule(self, newrule, nodelay=False):
+        self.logger.debug("remove_rule: timer - " + str(self._timer))
+
+        if (nodelay == True):
+            self._uninstall_rule(newrule)
+            self._update_rules()
+            self.logger.debug("    nodelay == True")
+
+        else:
+            self._rules_to_remove.append(newrule)
+#            self.logger.debug("    new rule: " + str(newrule))
+#            self.logger.debug("    rules in queue: " + str(self._rules_to_remove))
+            if self._timer is None:
+                self._timer = Timer(TIMEOUT, self._rule_timer)
+                self._timer.start()
+                self.logger.debug("    new timer   - " + str(self._timer))
+
+    def _uninstall_rule(self, newrule):
         # See has_rule for ordering decision.
         if newrule in self._raw_srcip_rules:
             self._raw_srcip_rules.remove(newrule)
@@ -120,8 +170,9 @@ class AssayRule:
         elif newrule in self._raw_other_rules:
             self._raw_other_rules.remove(newrule)
 
-
     def _update_rules(self):
+        self.logger.debug("_update_rules() called")
+
         # check if rules have changed
         temp_rule_list = self._generate_list_of_rules()
         # If they're the same, do nothing
@@ -156,9 +207,6 @@ class AssayRule:
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
 
-#        for rule in self._raw_other_rules:
-#            if rule not in temp_rule_list:
-#                temp_rule_list.append(rule)
 
 
         # Optimized rules 
@@ -189,8 +237,22 @@ class AssayRule:
 
             for prefix in CollapseAddrList(prefix_list):
                 rule_list.append(Match({src_or_dst: prefix}))           
-            
 
+        # These are the initial installation of rules that have basic 
+        # de-duplication, but nothing else. The optimized functions below are
+        # much better.
+#        for rule in self._raw_srcip_rules:
+#            if rule not in temp_rule_list:
+#                temp_rule_list.append(rule)
+#        for rule in self._raw_dstip_rules:
+#            if rule not in temp_rule_list:
+#                temp_rule_list.append(rule)
+#        for rule in self._raw_other_rules:
+#            if rule not in temp_rule_list:
+#                temp_rule_list.append(rule)
+            
+        # optimize_ip() was an initial pass at manually optimizing IP rules.
+        # optimize_ip_prefix() uses the functions in ipaddr-py package. Cleaner.
 #        optimize_ip(temp_rule_list, self._raw_srcip_rules, 'srcip')
 #        optimize_ip(temp_rule_list, self._raw_dstip_rules, 'dstip')
         optimize_ip_prefix(temp_rule_list, self._raw_srcip_rules, 'srcip')
@@ -344,37 +406,35 @@ if __name__ == "__main__":
 
     # Remove duplicates test
     dupe = AssayRule(AssayRule.DNS_NAME, 'dummy')
-    dupe.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    dupe.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    dupe.add_rule_group(Match(dict(dstip=IPAddr("1.2.3.4"))))
-    dupe.add_rule_group(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
-    dupe.add_rule_group(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
+    dupe.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    dupe.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    dupe.add_rule(Match(dict(dstip=IPAddr("1.2.3.4"))))
+    dupe.add_rule(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
+    dupe.add_rule(Match(dict(srcmac="aa:bb:cc:dd:ee:ff")))
 
 
     print "DUPLICATES TEST BEGIN"
-    dupe.finish_rule_group()
     dupe._display_for_testing()
     print "DUPLICATES TEST END"
     print ""
     
     # IP Optimization
     optimization = AssayRule(AssayRule.DNS_NAME, 'dummy')
-    optimization.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("1.2.3.0/24"))))
+    optimization.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("1.2.3.0/24"))))
 
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.4.0/24"))))
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("2.3.0.0/16"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("2.3.4.0/24"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("2.3.0.0/16"))))
 
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("3.2.0.0/16"))))
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("3.3.0.0/16"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("3.2.0.0/16"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("3.3.0.0/16"))))
 
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.2.0.0/16"))))
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.3.0.0/16"))))
-    optimization.add_rule_group(Match(dict(srcip=IPv4Network("4.3.4.0/24"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("4.2.0.0/16"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("4.3.0.0/16"))))
+    optimization.add_rule(Match(dict(srcip=IPv4Network("4.3.4.0/24"))))
 
 
     print "IP OPTIMIZATION TEST BEGIN"
-    optimization.finish_rule_group()
     optimization._display_for_testing()
     print "IP OPTIMIZATION TEST END"
     print ""
@@ -382,18 +442,17 @@ if __name__ == "__main__":
 
     # Others optimization
     others = AssayRule(AssayRule.DNS_NAME, 'dummy')
-    others.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"))))
-    others.add_rule_group(Match(dict(srcip=IPAddr("1.2.3.4"),srcport='1234')))
+    others.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"))))
+    others.add_rule(Match(dict(srcip=IPAddr("1.2.3.4"),srcport='1234')))
 
-    others.add_rule_group(Match(dict(srcip=IPAddr("2.3.4.5"))))
-    others.add_rule_group(Match(dict(srcport='2345')))
-    others.add_rule_group(Match(dict(srcip=IPAddr("2.3.4.5"),srcport='2345')))
+    others.add_rule(Match(dict(srcip=IPAddr("2.3.4.5"))))
+    others.add_rule(Match(dict(srcport='2345')))
+    others.add_rule(Match(dict(srcip=IPAddr("2.3.4.5"),srcport='2345')))
 
-    others.add_rule_group(Match(dict(srcip=IPv4Network("3.4.5.0/16"))))
-    others.add_rule_group(Match(dict(srcip=IPAddr("3.4.5.6"),srcport='2345')))
+    others.add_rule(Match(dict(srcip=IPv4Network("3.4.5.0/16"))))
+    others.add_rule(Match(dict(srcip=IPAddr("3.4.5.6"),srcport='2345')))
 
 
     print "OTHERS OPTIMIZATION TEST BEGIN"
-    others.finish_rule_group()
     others._display_for_testing()
     print "OTHERS OPTIMIZATION TEST END"
