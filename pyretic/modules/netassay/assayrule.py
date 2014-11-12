@@ -4,6 +4,7 @@
 import logging
 from ipaddr import IPv4Network, CollapseAddrList
 from pyretic.core.language import Match, basic_headers, tagging_headers
+from pyretic.modules.netassay.rulelimiter import RuleLimiter
 from threading import Timer
 
 TIMEOUT = 0.1
@@ -23,6 +24,7 @@ class AssayRule:
         self.type = ruletype
         self.value = value
         self.update_callbacks = rule_update_cbs
+        self.rule_limiter = RuleLimiter.get_instance()
 
         self.logger.debug("   self.type  = " + str(ruletype))
         self.logger.debug("   self.value = " + value)
@@ -76,10 +78,11 @@ class AssayRule:
         self._rules_to_remove = []
         self._update_rules()
         
-    def add_rule(self, newrule, nodelay=False):
+    def add_rule(self, newrule):
         self.logger.debug("add_rule: timer - " + str(self._timer))
 
-        if (nodelay == True):
+        delay = self.rule_limiter.get_delay()
+        if (0 == delay):
             self._install_rule(newrule)
             self._update_rules()
             self.logger.debug("    nodelay == True")
@@ -134,10 +137,11 @@ class AssayRule:
                 (newrule in self._raw_protocol_rules) |
                 (newrule in self._raw_other_rules))
 
-    def remove_rule(self, newrule, nodelay=False):
+    def remove_rule(self, newrule):
         self.logger.debug("remove_rule: timer - " + str(self._timer))
 
-        if (nodelay == True):
+        delay = self.rule_limiter.get_delay()
+        if (0 == delay):
             self._uninstall_rule(newrule)
             self._update_rules()
             self.logger.debug("    nodelay == True")
