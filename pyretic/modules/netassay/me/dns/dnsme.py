@@ -1,6 +1,8 @@
 # Copyright 2014 - Sean Donovan
 # DNS Metadata Engine
 
+ACTIVE_MAPPING = True
+
 import logging
 
 from dnsclassifier.dnsclassify import *
@@ -11,6 +13,10 @@ from pyretic.modules.netassay.me.metadataengine import *
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
+
+if ACTIVE_MAPPING == True:
+    from dns import resolver
+    from threading import timer
 
 
 class DNSMetadataEngineException(Exception):
@@ -65,6 +71,11 @@ class DNSMetadataEntry(MetadataEntry):
         else:
             self.data_source.set_new_callback(self.handle_new_entry_callback)
             #FIXME: classification change
+            if ACTIVE_MAPPING == True:
+                self._active_timer = None
+                self._active_results = []
+                self._active_get_mapping()
+                
 
     def handle_expiration_callback(self, addr, entry):
         self.logger.info("DNSMetadataEntry.handle_expiration_callback(): called with " + addr)
@@ -102,7 +113,43 @@ class DNSMetadataEntry(MetadataEntry):
         self.rule.add_rule(Match(dict(dstip=IPAddr(addr))))
         entry.register_timeout_callback(self.handle_expiration_callback)
 
-    
+    def _active_get_mapping(self):
+        # Anly working on A record now
+        results = resolve.query(name, 'A')
+        ttl = results.ttl
+
+        self._active_timer = Timer(ttl, self._active_get_mapping_expired)
+        self._active_timer.start()
+        new_active_results = []
+        
+        # These two reduce churn: only adds things that weren't there from the 
+        # previous pass, only deletes things that aren't there from this pass.
+        
+        # Add new addresses
+        for addr in results:
+            new_active_results.append(addr)
+            if addr not in self._active_results:
+                self.rule.add_rule(Match(dict(srcip=IPAddr(addr))))
+                self.rule.add_rule(Match(dict(dstip=IPAddr(addr))))
+
+        # Remove old addresses
+        for addr in self._active_results:
+            if addr not in results:
+                self.rule.remove_rule(Match(dict(srcip=IPAddr(addr))))
+                self.rule.remove_rule(Match(dict(dstip=IPAddr(addr))))
+
+        self._active_results = new_active_results
+        
+
+    def _active_get_mapping_expired(self):
+        self._active_timer.cancel()
+        self._active_get_mapping()
+
+    def __del__(self):
+        # Clean up timer, lest we cause other problems...
+        if ACTIVE_MAPPING == True:
+            if self._active_timer is not None:
+                self._active_timer.cancel()
 
 #--------------------------------------
 # NetAssayMatch subclasses
