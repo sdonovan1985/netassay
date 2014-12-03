@@ -3,7 +3,7 @@
 # tells them when to install rules.
 
 import logging
-from threading import Timer
+from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
 class RuleLimiter:
     INSTANCE = None
@@ -43,7 +43,7 @@ class RuleLimiter:
         '''
         delay = sum(self._logged_counts) + self._current_count
         self._current_count = self._current_count + 1
-        self.logger.debug("DELAY -------- " + str(delay * self.DELAY_MULTIPLIER) + "   " + str(self._logged_counts))
+#        self.logger.debug("DELAY -------- " + str(delay * self.DELAY_MULTIPLIER) + "   " + str(self._logged_counts))
         return delay * self.DELAY_MULTIPLIER
             
     def _reset_timer(self):
@@ -55,11 +55,11 @@ class RuleLimiter:
             self._timer = None
 
         self._timer = Timer(self.TIMEOUT, self._update_counts)
-        self.logger.debug("_reset_timer now!")
+#        self.logger.debug("_reset_timer now!")
         self._timer.start()
 
     def _update_counts(self):
-        self.logger.debug("_update_counts now! counts " + str(self._current_count) + " old: " + str(self._logged_counts))
+#        self.logger.debug("_update_counts now! counts " + str(self._current_count) + " old: " + str(self._logged_counts))
         self._logged_counts = self._logged_counts[0:self.COUNTS-1]
         self._logged_counts.insert(0, self._current_count)
         self._current_count = 0

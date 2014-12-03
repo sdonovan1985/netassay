@@ -19,11 +19,11 @@ class NetAssayMatch(DynamicFilter):
         self.logger = logging.getLogger(loggername)
         # probably should verify that the URL is vaid...
         self.me = metadata_engine 
+        self.matchaction = matchaction
         self.assayrule = AssayRule(ruletype, rulevalue)
         self.assayrule.set_update_callback(self.update_policy)
         self.me.new_rule(self.assayrule)
         self._classifier = self.generate_classifier()
-        self.matchaction = matchaction
 
     def update_policy(self):
         listofrules = self.assayrule.get_list_of_rules()

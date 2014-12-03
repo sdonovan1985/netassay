@@ -5,7 +5,7 @@ import logging
 from ipaddr import IPv4Network, CollapseAddrList
 from pyretic.core.language import Match, basic_headers, tagging_headers
 from pyretic.modules.netassay.rulelimiter import RuleLimiter
-from threading import Timer
+from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
 TIMEOUT = 0.1
 

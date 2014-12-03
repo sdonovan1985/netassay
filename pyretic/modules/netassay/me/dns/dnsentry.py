@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from threading import Timer
+from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
 
 # Creating a new entry takes at least 4 parameters.
