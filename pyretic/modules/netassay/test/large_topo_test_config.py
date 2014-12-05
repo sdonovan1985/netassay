@@ -7,7 +7,7 @@ import logging
 from random import randrange
 
 
-DOMAIN_LIST = "/home/mininet/netassay-optimization/pyretic/modules/netassay/test/alexa-top-100-2014-12-03.txt"
+DOMAIN_LIST = "pyretic/modules/netassay/test/alexa-top-100-2014-12-03.txt"
 SWITCH_WIDTH = 10
 RULES_TOTAL = 10000
 
@@ -50,12 +50,17 @@ class LargeTest(DynamicPolicy):
 
         self.list_of_rules = []        
         for i in range(RULES_TOTAL):
-            self.list_of_rules.append(self.generate_a_rule)
+            r = self.generate_a_rule()
+            print "RULE " + str(i)
+            self.list_of_rules.append(r)
 
         self.update_policy()
+        
+        print self.policy
 
     def update_policy(self):
         self.policy = self.assay_mcm.get_assay_ruleset() + union(self.list_of_rules)
+#        self.policy = self.assay_mcm.get_assay_ruleset() + disjoint(self.list_of_rules)
 
 
 

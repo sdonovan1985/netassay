@@ -18,12 +18,12 @@ class AssayRule:
     
     classtypes = [CLASSIFICATION, AS, AS_IN_PATH, DNS_NAME]
 
-    def __init__(self, ruletype, value, rule_update_cbs=[]):
+    def __init__(self, ruletype, value):
         logging.getLogger('netassay.AssayRule').info("AssayRule.__init__(): called")
         self.logger = logging.getLogger('netassay.AssayRule')
         self.type = ruletype
         self.value = value
-        self.update_callbacks = rule_update_cbs
+        self.update_callbacks = []
         self.rule_limiter = RuleLimiter.get_instance()
 
         self.logger.debug("   self.type  = " + str(ruletype))

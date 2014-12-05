@@ -15,7 +15,7 @@ from pyretic.lib.std import *
 from pyretic.lib.query import *
 
 if ACTIVE_MAPPING == True:
-    from dns import resolver
+    from dns import resolver, exception
     from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
 
@@ -122,36 +122,42 @@ class DNSMetadataEntry(MetadataEntry):
         entry.register_timeout_callback(self.handle_expiration_callback)
 
     def _active_get_mapping_expired(self):
-        self.logger.debug("_active_get_mapping_expired() called " + str(self._active_timer.is_alive()))
+        #self.logger.debug("_active_get_mapping_expired() called " + str(self._active_timer.is_alive()))
         self._active_timer.cancel()
         self._active_get_mapping()
 
     def _active_get_mapping(self):
         # Anly working on A record now
-        results = resolver.query(self.rule.value, 'A')
-        ttl = results.ttl
+        try:
+            results = resolver.query(self.rule.value, 'A')
+            ttl = results.ttl
 
-        self._active_timer = Timer(ttl, self._active_get_mapping_expired)
-        self._active_timer.start()
-        new_active_results = []
+            self._active_timer = Timer(ttl, self._active_get_mapping_expired)
+            self._active_timer.start()
+            new_active_results = []
         
-        # These two reduce churn: only adds things that weren't there from the 
-        # previous pass, only deletes things that aren't there from this pass.
+            # These two reduce churn: only adds things that weren't there from the 
+            # previous pass, only deletes things that aren't there from this pass.
         
-        # Add new addresses
-        for addr in results:
-            new_active_results.append(addr)
-            if addr not in self._active_results:
-                self.rule.add_rule(Match(dict(srcip=IPAddr(str(addr)))))
-                self.rule.add_rule(Match(dict(dstip=IPAddr(str(addr)))))
+            # Add new addresses
+            for addr in results:
+                new_active_results.append(addr)
+                if addr not in self._active_results:
+                    self.rule.add_rule(Match(dict(srcip=IPAddr(str(addr)))))
+                    self.rule.add_rule(Match(dict(dstip=IPAddr(str(addr)))))
 
-        # Remove old addresses
-        for addr in self._active_results:
-            if addr not in results:
-                self.rule.remove_rule(Match(dict(srcip=IPAddr(str(addr)))))
-                self.rule.remove_rule(Match(dict(dstip=IPAddr(str(addr)))))
+            # Remove old addresses
+            for addr in self._active_results:
+                if addr not in results:
+                    self.rule.remove_rule(Match(dict(srcip=IPAddr(str(addr)))))
+                    self.rule.remove_rule(Match(dict(dstip=IPAddr(str(addr)))))
 
-        self._active_results = new_active_results
+            self._active_results = new_active_results
+        except (resolver.NoAnswer, exception.Timeout):
+            self.logger.info("Could not query for " + self.rule.value + ". Trying again in 30 seconds.")
+            self._active_timer = Timer(30, self._active_get_mapping_expired)
+            self._active_timer.start()
+            self._active_results = []
         
 
 #--------------------------------------

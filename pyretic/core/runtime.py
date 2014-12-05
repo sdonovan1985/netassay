@@ -72,7 +72,6 @@ class Runtime(object):
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
         self.dynamic_sub_pols = set()
-        self.update_dynamic_sub_pols()
         self.in_network_update = False
         self.in_bucket_apply = False
         self.network_triggered_policy_update = False
@@ -84,6 +83,7 @@ class Runtime(object):
         self.old_rules = self.manager.list()
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
+        self.update_dynamic_sub_pols()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
