@@ -8,7 +8,7 @@
 
 import logging
 
-from pyretic.core.language import DyanmicPolicy, match, Match, drop, disjoint
+from pyretic.core.language import DynamicPolicy, match, Match, drop, disjoint
 from pyretic.modules.netassay.netassaymatch import NetAssayMatch
 from pyretic.lib.query import *
 from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
@@ -40,7 +40,7 @@ class NetAssayWindow:
         self.list_of_forwarding_rules.remove(rule)
         
 
-class visited(DynamicPolicy):
+class visited(DynamicFilter):
     '''
     Returns match statments for all the IP addresses that have visited whatever
     match action is defined by kwargs.
@@ -49,18 +49,18 @@ class visited(DynamicPolicy):
         super(visited,self).__init__()
         loggername = "netassay." + self.__class__.__name__
         logging.getLogger(loggername).info("__init__(): called")
-        self.logger = logginer.getLogger(loggername)
+        self.logger = logging.getLogger(loggername)
         self.naw = NetAssayWindow.get_instance()
 
         self.time_window = time_window
         self.kwargs_filter = match(**kwargs)
-        self.registered_rule = self.kwargs_filter >> self.important_pkts
         
         self.visit_list = []
         self.timer = None
 
         self.important_pkts = packets(1, ['srcmac', 'dstmac', 'srcip', 'dstip', 'srcport', 'dstport', 'protocol'])
         self.important_pkts.register_callback(self._pkt_callback)
+        self.registered_rule = self.kwargs_filter >> self.important_pkts
 
         self.naw.register_forwarding_rule(self.registered_rule)
     
@@ -157,14 +157,23 @@ class visited(DynamicPolicy):
         When there is a change in the visit list (addition or subtraction),
         update the policy that's being returned.
         '''
+        list_of_rules = []
 
-        # See assayrule.py line 105
+        for entry in self.visit_list:
+            list_of_rules.append(Match({'srcip' : entry['ip']}))
+            list_of_rules.append(Match({'dstip' : entry['ip']}))
 
-        # Only care about the local addresses.
-        pass
-    
+        count = len(list_of_rules)
+        if count == 0:
+            self.policy = drop
+        else:
+            new_policy = union(list_of_rules)
+            self.policy = new_policy
+
     def __repr__(self):
-        pass
+        retval = self.__class__.__name__ + ":"
+        retval = retval + "\n    Window: " + str(self.time_window)
+        retval = retval + "\n    " + str(self.kwargs_filter)
 
     def _in_visit_list(self, new_pkt):
         for entry in self.visit_list:
@@ -181,7 +190,38 @@ class visited(DynamicPolicy):
         '''
         update_needed = True
         for entry in self.visit_list:
-            if (entry['ip'] == new_pkt['ip'])
+            if (entry['ip'] == new_pkt['ip']):
                 self.visit_list.remove(entry)
                 return update_needed
             update_needed = False
+
+    def generate_classifier(self):
+        self.logger.debug("generate_classifier called")
+        self.policy.compile()    
+
+    def __eq__(self, other):
+        return (isinstance(other, type(self)) and
+                self.kwargs_filter == other.kwargs_filter)
+
+
+    def intersect(self, pol):
+        self.logger.debug("Intersect called")
+        
+        if pol == identity:
+            return self
+        elif pol == drop:
+            return drop
+        elif 0 == len(self.visit_list):
+            return drop
+        #FIXME - netassaymatch.py line 78
+        
+        return pol.intersect(self.policy())
+
+    def covers(self, other):
+        # FIXME: Stolen from NetAssayMatch. May need to update.
+        if (other == self):
+            return True
+        return False
+                          
+    
+    
