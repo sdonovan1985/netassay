@@ -214,6 +214,9 @@ class Runtime(object):
                                               "classifier="+repr(classifier)))
             self.install_classifier(classifier)
 
+            logging.getLogger("netassay.evaluation").critical("CLASSIFIER LEN = " + str(len(classifier)))
+            logging.getLogger("netassay.evaluation").critical("FINISHED UPDATE")
+
 
     def update_dynamic_sub_pols(self):
         """

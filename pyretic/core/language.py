@@ -1579,7 +1579,7 @@ class match(DynamicFilter):
         else:
             drop
         #self._classifier = self.generate_classifier
-        print self
+#        print self
 
     def __repr__(self):
         return self.policy.__repr__()

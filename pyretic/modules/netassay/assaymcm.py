@@ -46,7 +46,7 @@ class AssayMainControlModule:
     def setup_logger(self):
         formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
         console = logging.StreamHandler()
-        console.setLevel(logging.DEBUG)
+        console.setLevel(logging.WARNING)
         console.setFormatter(formatter)
         logfile = logging.FileHandler('netassay.log')
         logfile.setLevel(logging.DEBUG)

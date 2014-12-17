@@ -6,10 +6,12 @@ from pyretic.modules.netassay.assaymcm import *
 import logging
 from random import randrange
 
+from pyretic.modules.netassay.me.dns.dnsme import DNSMetadataEngine
+from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
 DOMAIN_LIST = "pyretic/modules/netassay/test/alexa-top-100-2014-12-03.txt"
 SWITCH_WIDTH = 10
-RULES_TOTAL = 10000
+RULES_TOTAL = 1000
 
 def get_list_of_domains():
     f = open(DOMAIN_LIST, 'r')
@@ -44,6 +46,7 @@ class LargeTest(DynamicPolicy):
         self.domains = get_list_of_domains()
         
         self.assay_mcm = AssayMainControlModule.get_instance()
+        self.dnsme = DNSMetadataEngine.get_instance()
 
         # RootSwitch gets no rules
         # Each of the children switches gets RULES_PER_SWITCH rules.
@@ -51,12 +54,19 @@ class LargeTest(DynamicPolicy):
         self.list_of_rules = []        
         for i in range(RULES_TOTAL):
             r = self.generate_a_rule()
-            print "RULE " + str(i)
+            logging.getLogger("netassay.evaluation").critical("RULE " + str(i))
             self.list_of_rules.append(r)
 
+#        self.logger.warning("STARTING TIMER install_new_rule")
+#        self.update_timer = Timer(30, self.install_new_rule)
+#        self.update_timer.start()
+
+        logging.getLogger("netassay.evaluation").critical("SETUP COMPLETE")
         self.update_policy()
+
         
-        print self.policy
+        
+#        print self.policy
 
     def update_policy(self):
         self.policy = self.assay_mcm.get_assay_ruleset() + union(self.list_of_rules)
@@ -68,8 +78,14 @@ class LargeTest(DynamicPolicy):
         random_switch = randrange(0, SWITCH_WIDTH + 1)
         random_port   = randrange(0, SWITCH_WIDTH)
         random_site = self.domains[randrange(0,100)]
+
+        self.random_site = random_site
+
         return (match(switch=random_switch, domain=random_site) >> fwd(random_port))
 
+    def install_new_rule(self):
+        self.logger.warning("BEGINNING OF install_new_rule")
+        self.dnsme._install_new_rule(self.random_site, "192.168.1.100")
 
 def main():
     return LargeTest()

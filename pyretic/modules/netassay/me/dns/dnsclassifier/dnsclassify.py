@@ -92,6 +92,23 @@ class DNSClassifier:
                     #placeholder
                     print "Found an MX!"
 
+    def _install_new_rule(self, domain, addr):
+        # DIRTY, doesn't handle classification.
+        if addr not in self.db.keys():
+            self.db[addr] = Entry(addr, list(), "", 1000)
+            self.db[addr].names.append(domain)
+            for callback in self.new_callbacks:
+                callback(addr, self.db[addr])
+
+        else:
+            self.db[addr].update_expiry(1000)
+            
+            if domain not in self.db[addr].names:
+                self.db[addr].names.append(domain)
+            for callback in self.update_callbacks:
+                callback(addr, self.db[addr])
+            
+
     def _clean_expiry_full(self):
         # Loop through everything to check for expired DNS entries
         for key in self.db.keys():

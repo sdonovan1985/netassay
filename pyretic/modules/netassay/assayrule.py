@@ -61,6 +61,9 @@ class AssayRule:
 #        self.logger.debug("    _rules_to_add:    " + str(self._rules_to_add))
 #        self.logger.debug("    _rules_to_remove: " + str(self._rules_to_remove))
 
+        total_rules_changed = len(self._rules_to_add) + len(self._rules_to_remove)
+        logging.getLogger("netassay.evaluation").critical("_RULE_TIMER " + 
+                                                          str(total_rules_changed))
         # Stop the running delay timer
         if self._timer is not None:
             self.logger.debug("    cancelling timer")
@@ -82,12 +85,14 @@ class AssayRule:
         self.logger.debug("add_rule: timer - " + str(self._timer))
 
         delay = self.rule_limiter.get_delay()
-        if (0 == delay):
+        if (delay == 0):
             self._install_rule(newrule)
+            logging.getLogger("netassay.evaluation").critical("_UPDATE_RULES")
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
+            logging.getLogger("netassay.evaluation").critical("INSERT DELAY")
             self._rules_to_add.append(newrule)
 #            self.logger.debug("    new rule: " + str(newrule))
 #            self.logger.debug("    rules in queue: " + str(self._rules_to_add))
@@ -143,10 +148,12 @@ class AssayRule:
         delay = self.rule_limiter.get_delay()
         if (0 == delay):
             self._uninstall_rule(newrule)
+            logging.getLogger("netassay.evaluation").critical("_UPDATE_RULES")
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
+            logging.getLogger("netassay.evaluation").critical("INSERT DELAY")
             self._rules_to_remove.append(newrule)
 #            self.logger.debug("    new rule: " + str(newrule))
 #            self.logger.debug("    rules in queue: " + str(self._rules_to_remove))
@@ -176,15 +183,16 @@ class AssayRule:
 
     def _update_rules(self):
         self.logger.debug("_update_rules() called")
-
         # check if rules have changed
         temp_rule_list = self._generate_list_of_rules()
         # If they're the same, do nothing
         if set(temp_rule_list) == set(self._rule_list):
             self.logger.debug("_update_rules: No changes in rule list")
+            logging.getLogger("netassay.evaluation").critical("NO RULES TO ADD")
         else:
             # if they're different, call the callbacks
             self._rule_list = temp_rule_list
+            logging.getLogger("netassay.evaluation").critical("RULES TO ADD")
             for cb in self.update_callbacks:
                 self.logger.debug("_update_rules: calling " + str(cb))
                 cb()

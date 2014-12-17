@@ -47,8 +47,8 @@ class NetAssayMatch(DynamicFilter):
 
     def __repr__(self):
         retval = self.__class__.__name__ + ": " + self.assayrule.value
-        for rule in self.assayrule.get_list_of_rules():
-            retval = retval + "\n   " + str(rule)
+#        for rule in self.assayrule.get_list_of_rules():
+#            retval = retval + "\n   " + str(rule)
         return retval
 
     def generate_classifier(self):

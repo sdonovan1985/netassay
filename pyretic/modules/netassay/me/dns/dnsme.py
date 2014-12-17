@@ -61,10 +61,13 @@ class DNSMetadataEngine(MetadataEngine):
         return dns_inbound + dns_outbound
 
     def _dns_parse_cb(self, pkt):
+        logging.getLogger("netassay.evaluation").critical("BEGIN UPDATE")
         self.logger.info("DNSMetadataEngine._dns_parse_cb(): called")
         self.data_source.parse_new_DNS(pkt['raw'][self.offset:])
         #self.data_source.print_entries()
 
+    def _install_new_rule(self, domain, ipaddr):
+        self.data_source._install_new_rule(domain, ipaddr)
     
 
 class DNSMetadataEntry(MetadataEntry):
@@ -128,7 +131,11 @@ class DNSMetadataEntry(MetadataEntry):
 
     def _active_get_mapping(self):
         # Anly working on A record now
+        if ((self._active_timer != None) and
+            (self._active_timer.is_alive())):
+                return
         try:
+            logging.getLogger("netassay.evaluation").critical("BEGIN UPDATE")
             results = resolver.query(self.rule.value, 'A')
             ttl = results.ttl
 
