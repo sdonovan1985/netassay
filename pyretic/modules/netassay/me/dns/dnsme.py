@@ -61,7 +61,6 @@ class DNSMetadataEngine(MetadataEngine):
         return dns_inbound + dns_outbound
 
     def _dns_parse_cb(self, pkt):
-        logging.getLogger("netassay.evaluation").critical("BEGIN UPDATE")
         self.logger.info("DNSMetadataEngine._dns_parse_cb(): called")
         self.data_source.parse_new_DNS(pkt['raw'][self.offset:])
         #self.data_source.print_entries()
@@ -135,7 +134,6 @@ class DNSMetadataEntry(MetadataEntry):
             (self._active_timer.is_alive())):
                 return
         try:
-            logging.getLogger("netassay.evaluation").critical("BEGIN UPDATE")
             results = resolver.query(self.rule.value, 'A')
             ttl = results.ttl
 

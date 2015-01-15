@@ -7,6 +7,9 @@ from pyretic.core.language import Match, basic_headers, tagging_headers
 from pyretic.modules.netassay.rulelimiter import RuleLimiter
 from pyretic.modules.netassay.lib.py_timer import py_timer as Timer
 
+from pyretic.modules.netassay.eval.serial_logging import serial_logging
+
+
 TIMEOUT = 0.1
 
 class AssayRule:
@@ -17,6 +20,7 @@ class AssayRule:
     DNS_NAME       = 4
     
     classtypes = [CLASSIFICATION, AS, AS_IN_PATH, DNS_NAME]
+    global SERIAL
 
     def __init__(self, ruletype, value):
         logging.getLogger('netassay.AssayRule').info("AssayRule.__init__(): called")
@@ -62,8 +66,8 @@ class AssayRule:
 #        self.logger.debug("    _rules_to_remove: " + str(self._rules_to_remove))
 
         total_rules_changed = len(self._rules_to_add) + len(self._rules_to_remove)
-        logging.getLogger("netassay.evaluation").critical("_RULE_TIMER " + 
-                                                          str(total_rules_changed))
+
+
         # Stop the running delay timer
         if self._timer is not None:
             self.logger.debug("    cancelling timer")
@@ -84,16 +88,26 @@ class AssayRule:
     def add_rule(self, newrule):
         self.logger.debug("add_rule: timer - " + str(self._timer))
 
+        #FOR EVAL
+        serial = serial_logging.get_number()
+        logging.getLogger("netassay.evaluation2").critical("ADD_RULE " + str(serial))
+
+
+
         delay = self.rule_limiter.get_delay()
         if (delay == 0):
-            self._install_rule(newrule)
-            logging.getLogger("netassay.evaluation").critical("_UPDATE_RULES")
+#            self._install_rule(newrule)
+            logging.getLogger("netassay.evaluation2").critical("NO_DELAY " + 
+                                                               str(serial))
+            self._install_rule({'rule':newrule, 'serial':serial})
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
-            logging.getLogger("netassay.evaluation").critical("INSERT DELAY")
-            self._rules_to_add.append(newrule)
+            logging.getLogger("netassay.evaluation2").critical("WITH_DELAY " + 
+                                                               str(serial))
+#            self._rules_to_add.append(newrule)
+            self._rules_to_add.append({'rule':newrule, 'serial':serial})
 #            self.logger.debug("    new rule: " + str(newrule))
 #            self.logger.debug("    rules in queue: " + str(self._rules_to_add))
             if self._timer is None:
@@ -105,10 +119,12 @@ class AssayRule:
         # Does not check to see if it's a duplicate rule, as this allows the 
         # same rule to be installed for different reasons, and they can be 
         # removed individually.
-        if isinstance(newrule, Match):
+        logging.getLogger("netassay.evaluation2").critical("INSTALL_RULE " + 
+                                                           str(newrule['serial']))
+        if isinstance(newrule['rule'], Match):
             #FIXME: Can this optimize over multiple items?
-            if len(newrule.map.keys()) == 1:
-                key = newrule.map.keys()[0] # get the key of the only value
+            if len(newrule['rule'].map.keys()) == 1:
+                key = newrule['rule'].map.keys()[0] # get the key of the only value
                 if (key == 'srcmac'):
                     self._raw_srcmac_rules.append(newrule)
                 elif (key == 'dstmac'):
@@ -131,30 +147,38 @@ class AssayRule:
             self._raw_other_rules.append(newrule)
 
 
-    def has_rule(self, newrule):
-        # In expected order of being true. Please rearrange as appropriate.
-        return ((newrule in self._raw_srcip_rules) |
-                (newrule in self._raw_dstip_rules) |
-                (newrule in self._raw_srcmac_rules) |
-                (newrule in self._raw_dstmac_rules) |
-                (newrule in self._raw_srcport_rules) |
-                (newrule in self._raw_dstport_rules) |
-                (newrule in self._raw_protocol_rules) |
-                (newrule in self._raw_other_rules))
+#    def has_rule(self, newrule):
+#        return ((newrule in self._raw_srcip_rules) |
+#                (newrule in self._raw_dstip_rules) |
+#                (newrule in self._raw_srcmac_rules) |
+#                (newrule in self._raw_dstmac_rules) |
+#                (newrule in self._raw_srcport_rules) |
+#                (newrule in self._raw_dstport_rules) |
+#                (newrule in self._raw_protocol_rules) |
+#                (newrule in self._raw_other_rules))
 
     def remove_rule(self, newrule):
         self.logger.debug("remove_rule: timer - " + str(self._timer))
 
+        #FOR EVAL
+        serial = serial_logging.get_number()
+        logging.getLogger("netassay.evaluation2").critical("REMOVE_RULE " + 
+                                                           str(serial))
+
         delay = self.rule_limiter.get_delay()
         if (0 == delay):
-            self._uninstall_rule(newrule)
-            logging.getLogger("netassay.evaluation").critical("_UPDATE_RULES")
+#            self._uninstall_rule(newrule)
+            logging.getLogger("netassay.evaluation2").critical("NO_DELAY " + 
+                                                               str(serial))
+            self._uninstall_rule({'rule':newrule, 'serial':serial})
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
-            logging.getLogger("netassay.evaluation").critical("INSERT DELAY")
-            self._rules_to_remove.append(newrule)
+            logging.getLogger("netassay.evaluation2").critical("WITH_DELAY" + 
+                                                               str(serial))
+#            self._rules_to_remove.append(newrule)
+            self._rules_to_remove.append({'rule':newrule, 'serial':serial})
 #            self.logger.debug("    new rule: " + str(newrule))
 #            self.logger.debug("    rules in queue: " + str(self._rules_to_remove))
             if self._timer is None:
@@ -163,39 +187,89 @@ class AssayRule:
                 self.logger.debug("    new timer   - " + str(self._timer))
 
     def _uninstall_rule(self, newrule):
-        # See has_rule for ordering decision.
-        if newrule in self._raw_srcip_rules:
-            self._raw_srcip_rules.remove(newrule)
-        elif newrule in self._raw_dstip_rules:
-            self._raw_dstip_rules.remove(newrule)
-        elif newrule in self._raw_srcmac_rules:
-            self._raw_srcmac_rules.remove(newrule)
-        elif newrule in self._raw_dstmac_rules:
-            self._raw_dstmac_rules.remove(newrule)
-        elif newrule in self._raw_srcport_rules:
-            self._raw_srcport_rules.remove(newrule)
-        elif newrule in self._raw_dstport_rules:
-            self._raw_dstport_rules.remove(newrule)
-        elif newrule in self._raw_protocol_rules:
-            self._raw_protocol_rules.remove(newrule)
-        elif newrule in self._raw_other_rules:
-            self._raw_other_rules.remove(newrule)
+        # In expected order of being true. Please rearrange as appropriate.
+        
+        # Thanks to: https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+        logging.getLogger("netassay.evaluation2").critical("UNINSTALL_RULE" + 
+                                                           str(newrule['serial']))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_srcip_rules) != []:
+            self._raw_srcip_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_srcip_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_dstip_rules) != []:
+            self._raw_dstip_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_dstip_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_srcmac_rules) != []:
+            self._raw_srcmac_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_srcmac_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_dstmac_rules) != []:
+            self._raw_dstmac_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_dstmac_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_srcport_rules) != []:
+            self._raw_srcport_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_srcport_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_dstport_rules) != []:
+            self._raw_dstport_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_dstport_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_protocol_rules) != []:
+            self._raw_protocol_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_protocol_rules))
+        if filter(lambda rule: rule['rule'] == newrule, 
+                  self._raw_other_rules) != []:
+            self._raw_other_rules.remove(
+                filter(lambda rule: rule['rule'] == newrule, 
+                       self._raw_other_rules))
+
+#        if newrule in self._raw_srcip_rules:
+#            self._raw_srcip_rules.remove(newrule)
+#        elif newrule in self._raw_dstip_rules:
+#            self._raw_dstip_rules.remove(newrule)
+#        elif newrule in self._raw_srcmac_rules:
+#            self._raw_srcmac_rules.remove(newrule)
+#        elif newrule in self._raw_dstmac_rules:
+#            self._raw_dstmac_rules.remove(newrule)
+#        elif newrule in self._raw_srcport_rules:
+#            self._raw_srcport_rules.remove(newrule)
+#        elif newrule in self._raw_dstport_rules:
+#            self._raw_dstport_rules.remove(newrule)
+#        elif newrule in self._raw_protocol_rules:
+#            self._raw_protocol_rules.remove(newrule)
+#        elif newrule in self._raw_other_rules:
+#            self._raw_other_rules.remove(newrule)
+
 
     def _update_rules(self):
         self.logger.debug("_update_rules() called")
+        logging.getLogger("netassay.evaluation2").critical("UPDATE_RULES")
+
         # check if rules have changed
         temp_rule_list = self._generate_list_of_rules()
         # If they're the same, do nothing
         if set(temp_rule_list) == set(self._rule_list):
             self.logger.debug("_update_rules: No changes in rule list")
-            logging.getLogger("netassay.evaluation").critical("NO RULES TO ADD")
+            logging.getLogger("netassay.evaluation2").critical("NO_RULES_TO_ADD")
         else:
             # if they're different, call the callbacks
             self._rule_list = temp_rule_list
-            logging.getLogger("netassay.evaluation").critical("RULES TO ADD")
+            logging.getLogger("netassay.evaluation2").critical("RULES_TO_ADD")
             for cb in self.update_callbacks:
                 self.logger.debug("_update_rules: calling " + str(cb))
                 cb()
+        logging.getLogger("netassay.evaluation2").critical("UPDATE_RULES_FINISHED")
+
 
     def _generate_list_of_rules(self):
         # This generates teh list of rules and returns them This allows us
@@ -203,19 +277,24 @@ class AssayRule:
         temp_rule_list = []
         
         # Append non-optimized rules, remove dupes
-        for rule in self._raw_protocol_rules:
+        for ruledict in self._raw_protocol_rules:
+            rule = ruledict['rule']
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
-        for rule in self._raw_srcmac_rules:
+        for ruledict in self._raw_srcmac_rules:
+            rule = ruledict['rule']
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
-        for rule in self._raw_dstmac_rules:
+        for ruledict in self._raw_dstmac_rules:
+            rule = ruledict['rule']
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
-        for rule in self._raw_srcport_rules:
+        for ruledict in self._raw_srcport_rules:
+            rule = ruledict['rule']
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
-        for rule in self._raw_dstport_rules:
+        for ruledict in self._raw_dstport_rules:
+            rule = ruledict['rule']
             if rule not in temp_rule_list:
                 temp_rule_list.append(rule)
 
@@ -223,8 +302,12 @@ class AssayRule:
 
         # Optimized rules 
         # ipaddr documentation: https://code.google.com/p/ipaddr-py/wiki/Using3144
-        def optimize_ip(rule_list, ip_rule_list, src_or_dst):
+        def optimize_ip(rule_list, ip_rule_list_of_dicts, src_or_dst):
             to_remove_list = []
+            ip_rule_list = []
+            for ruledict in ip_rule_list_of_dicts:
+                ip_rule_list.append(ruledict['rule'])
+
             temp_ip_rules = sorted(ip_rule_list, key=lambda ad: ad.map[src_or_dst].prefixlen)
             for rule in temp_ip_rules:
                 # +1 is to skip the current rule...
@@ -242,8 +325,12 @@ class AssayRule:
 
         # This is a replacement for optimize_ip(), but I'm leaving the other
         # just in case the old one is faster.
-        def optimize_ip_prefix(rule_list, ip_rule_list, src_or_dst):
+        def optimize_ip_prefix(rule_list, ip_rule_list_of_dicts, src_or_dst):
             prefix_list = []
+            ip_rule_list = []
+            for ruledict in ip_rule_list_of_dicts:
+                ip_rule_list.append(ruledict['rule'])
+
             for rule in ip_rule_list:
                 prefix_list.append(rule.map[src_or_dst])
 

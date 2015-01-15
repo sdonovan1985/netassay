@@ -110,9 +110,11 @@ class py_timer_manager:
             # prevents the case where a 3 day long timer for a long lived DNS
             # entry keeps the program running for ages.
             self.thread_timer.daemon = True
-            self.thread_timer.start()
-
-
+            try:
+                self.thread_timer.start()
+            except RuntimeError:
+                # Don't worry about this one.
+                return
 
 
 class py_timer:
