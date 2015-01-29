@@ -9,15 +9,17 @@ import threading
 
 
 class BGPUpdate:
-    def __init__(self, update, src_as, aspath, next_hop, network):
-        self.update = update
+    def __init__(self, src_as, aspath, next_hop, network):
         self.src_as = src_as
         self.aspath = aspath
         self.next_hop = next_hop
         self.network = network
 
-    def equivalent(self, src_as, network):
-        if (src_as == self.src_as) && (network == self.network):
+    def equivalent(self, other):
+        if ((other.src_as == self.src_as) && 
+            (other.aspath == self.aspath) &&
+            (other.next_hop == self.next_hop) &&
+            (other.network == self.network)):
             return True
         return False
 
@@ -30,13 +32,13 @@ class BGPQueryHandler:
         self.update_in_path_callbacks = {}
         self.remove_in_path_callbacks = {}
 
-        # Setup data base - dictionary
+        # Setup data base - list of dictionaries
         # Dictionary has 4 pieces:
         #    'asn'     : AS number of announced route
         #    'src_asn' : AS that route came from
         #    'network' : The prefix announced
         #    'update'  : the BGPUpdate class that's most current.
-        self.db = {}
+        self.db = []
         
 
         # Preload data source - Load from RIB
@@ -88,21 +90,105 @@ class BGPQueryHandler:
 
 
     def new_route(self, update):
-        #TODO
+        aspath = upate.aspath
+        asn = aspath.split()[-1]
+        src_as = update.src_as
+        network = update.network
+
+        as_cb = self.remove_as_callbacks.keys()
+        in_path_cb = self.remove_in_path_callbacks.keys()
+                
+
+        
+        # Check if the main parts of the updates are in the database
+        for entry in self.db:
+            if ((entry['asn'] == asn) &&
+                (entry['src_asn'] == src_asn) &&
+                (entry['network'] == network) &&
+                (entry['update'].equivalent(update))):
+                # They're the same... Do nothing:
+                return
+            if ((entry['asn'] == asn) &&
+                (entry['src_asn'] == src_asn) &&
+                (entry['network'] == network) &&
+                (!entry['update'].equivalent(update))):
+
+                # Different, remove old routes.
+                if asnin in as_cb:
+                    self.call_remove_AS_callbacks(asn, network)
+                
+                for asnin in aspath.split():
+                    if asnin in in_path_cb:
+                        self.call_remove_path_AS_callbacks(asnin, network)
+
+                self.db.remove(entry)
+                break
+        # add new one to DB
+        self.db.append({'asn':asn, 'src_asn':src_as, 
+                        'network':network, 'update':update})
+
+        # install new rules through the callbacks
+        if asnin in as_cb:
+            self.call_update_AS_callbacks(asn, network)
+            
+        for asnin in aspath.split():
+            if asnin in in_path_cb:
+                self.call_update_path_AS_callbacks(asnin, network)
+                    
 
         pass
-        
 
     def withdraw_route(self, update):
-        #TODO
-        pass
+        aspath = upate.aspath
+        asn = aspath.split()[-1]
+        src_as = update.src_as
+        network = update.network
+
+        as_cb = self.remove_as_callbacks.keys()
+        in_path_cb = self.remove_in_path_callbacks.keys()
+                
+
+        
+        # Check if the main parts of the updates are in the database
+        for entry in self.db:
+            if ((entry['asn'] == asn) &&
+                (entry['src_asn'] == src_asn) &&
+                (entry['network'] == network) &&
+                (entry['update'].equivalent(update))):
+                # They're the same... Do nothing:
+                return
+            if ((entry['asn'] == asn) &&
+                (entry['src_asn'] == src_asn) &&
+                (entry['network'] == network) &&
+                (!entry['update'].equivalent(update))):
+
+                # Different, remove old routes.
+                if asnin in as_cb:
+                    self.call_remove_AS_callbacks(asn, network)
+                
+                for asnin in aspath.split():
+                    if asnin in in_path_cb:
+                        self.call_remove_path_AS_callbacks(asnin, network)
+
+                self.db.remove(entry)
+                break
         
     
     def query_from_AS(self, asn):
-        #TODO
-        pass
+        # Loop through the database, add prefixes to prefixes list
+        prefixes = []
+        
+        for entry in self.db:
+            if entry['asn'] == asn:
+                prefixes.append(entry['network'])
+
+        return prefixes
 
     def query_in_path(self, asn):
-        #TODO
-        pass
+        prefixes = []
+
+        for entry in self.db:
+            aspath = entry['update'].aspath.split()
+            if asn in aspath:
+                prefixes.append(entry['network'])
 
