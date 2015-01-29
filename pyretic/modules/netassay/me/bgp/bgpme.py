@@ -63,13 +63,21 @@ class BGPMetadataEntry:
         
         #register for all the callbacks necessary
         if self.rule.type == AssayRule.AS:
-            bgp_source.register_for_AS(
-                self.handle_AS_callback,
+            bgp_source.register_for_update_AS(
+                self.handle_update_AS_callback,
                 str(self.rule.value))
+            bgp_source.register_for_remove_AS(
+                self.handle_remove_AS_callback,
+                str(self.rule.value))
+
         elif self.rule.type == AssayRule.AS_IN_PATH:
-            bgp_source.register_for_in_path(
-                self.handle_AS_callback,
+            bgp_source.register_for_update_in_path(
+                self.handle_update_AS_callback,
                 str(self.rule.value))
+            bgp_source.register_for_remove_in_path(
+                self.handle_remove_AS_callback,
+                str(self.rule.value))
+
 
         #setup based on initial BGP data
         if self.rule.type == AssayRule.AS:
@@ -83,12 +91,15 @@ class BGPMetadataEntry:
                 self.rule.add_rule(Match(dict(srcip=IPPrefix(prefix))))
                 self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
 
-        #TODO: need to handle withdrawals!
-
-    def handle_AS_callback(self, prefix):
-        self.logger.info("BGPMetatdataEntry.handle_AS_callback(): called with prfix " + prefix)
+    def handle_update_AS_callback(self, prefix):
+        self.logger.info("BGPMetatdataEntry.handle_update_AS_callback(): called with prefix " + prefix)
         self.rule.add_rule(Match(dict(srcip=IPPrefix(prefix))))
         self.rule.add_rule(Match(dict(dstip=IPPrefix(prefix))))
+
+    def handle_remove_AS_callback(self, prefix):
+        self.logger.info("BGPMetatdataEntry.handle_remove_AS_callback(): called with prefix " + prefix)
+        self.rule.remove_rule(Match(dict(srcip=IPPrefix(prefix))))
+        self.rule.remove_rule(Match(dict(dstip=IPPrefix(prefix))))
 
 
 #--------------------------------------
