@@ -5,15 +5,27 @@
 # server socket that listens for update streams based on the also-defined 
 # BGPUpdate class
 
+
 import threading
+import sys
+import re
+import pickle
+
+FILENAME = '/home/mininet/bgptools/rib.snip.txt'
+SOCKETNUM = 12345
 
 
 class BGPUpdate:
+    
+    WITHDRAWAL = 1
+    UPDATE     = 2
+
     def __init__(self, src_as, aspath, next_hop, network):
         self.src_as = src_as
         self.aspath = aspath
         self.next_hop = next_hop
         self.network = network
+        self.type = None
 
     def equivalent(self, other):
         if ((other.src_as == self.src_as) && 
@@ -42,12 +54,15 @@ class BGPQueryHandler:
         
 
         # Preload data source - Load from RIB
-        #TODO
+        self.parse_rib(FILENAME)
         
-        # update data source - socket handling in seperate thread.
-        #TODO
+        # Update data source - socket handling in seperate thread. 
+        # Note: May not clean up nicely.
+        self.server_thread = threading.thread(target=self.listen_for_updates)
+        self.server_thread.daemon = True
+        self.server_thread.start()
 
-    def register_for_update_AS(self, cb, asnum):
+    def register_for_update_AS(self, cb, asnum):0
         if asnum not in self.as_callbacks.keys():
             self.update_as_callbacks[asnum] = list()
         if cb not in self.as_callbacks[asnum]:
@@ -192,3 +207,58 @@ class BGPQueryHandler:
             if asn in aspath:
                 prefixes.append(entry['network'])
 
+
+
+    def parse_rib(self, filename):
+        inputfile = open(filename, 'r')
+
+        # lots of REs
+        blank_line_re = re.compile('^\s*$')
+        aspath_re = re.compile('ASPATH: ([0-9 ]+)')
+        network_re = re.compile('PREFIX: ([0-9\./]+)')
+        nexthop_re = re.compile('NEXT_HOP: ([0-9\.]+)')
+        
+        src_as = None
+        aspath = None
+        next_hop = None
+        network = None
+        for line in inputfile:
+            if blank_line_re.match(line):
+                update = BGPUpdate(src_as, aspath, next_hop, network)
+                asn = aspath.split()[-1]
+                self.db.append({'asn':asn, 'src_asn':src_as,
+                                'network':network, 'update':update})
+                src_as = None
+                aspath = None
+                next_hop = None
+                network = None
+            elif aspath_re.match(line):
+                aspath = aspath_re.match(line).group()[0]
+            elif network_re.match(line):
+                network = network_re.match(line).group()[0]
+            elif nexthop_re.match(line):
+                next_hop = nexthop_re.match(line).group()[0]
+
+            
+        inputfile.close()
+
+    def listen_for_updates(self):
+        server_socket = socket(AF_INET, SOCK_STREAM)
+        server_socket.bind('127.0.0.1', SOCKETNUM)
+        server_socket.listen(1)
+
+        while 1:
+            connection_socket, client_address = server_socket.accept()
+            
+            update = pickle.loads(connectionSocket.recv(2048))
+            
+            if update.type == BGPUpdate.UPDATE:
+                self.new_route(update)
+            elif update.type == BGPUpdate.WITHDRAWAL:
+                self.withdraw_route(update)
+
+            connectionSocket.send("THANKS")
+            connectionSocket.close()
+
+            
+            
