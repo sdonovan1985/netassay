@@ -247,9 +247,8 @@ class BGPQueryHandler:
         server_socket.bind('127.0.0.1', SOCKETNUM)
         server_socket.listen(1)
 
-        while 1:
-            connection_socket, client_address = server_socket.accept()
-            
+        connection_socket, client_address = server_socket.accept()
+        while True:
             update = pickle.loads(connectionSocket.recv(2048))
             
             if update.type == BGPUpdate.UPDATE:
@@ -258,7 +257,7 @@ class BGPQueryHandler:
                 self.withdraw_route(update)
 
             connectionSocket.send("THANKS")
-            connectionSocket.close()
+        connectionSocket.close()
 
             
             
