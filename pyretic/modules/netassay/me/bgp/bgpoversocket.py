@@ -10,6 +10,7 @@ import threading
 import sys
 import re
 import pickle
+from socket import *
 
 FILENAME = '/home/mininet/bgptools/rib.snip.txt'
 SOCKETNUM = 12345
@@ -28,9 +29,9 @@ class BGPUpdate:
         self.type = None
 
     def equivalent(self, other):
-        if ((other.src_as == self.src_as) && 
-            (other.aspath == self.aspath) &&
-            (other.next_hop == self.next_hop) &&
+        if ((other.src_as == self.src_as) and 
+            (other.aspath == self.aspath) and
+            (other.next_hop == self.next_hop) and
             (other.network == self.network)):
             return True
         return False
@@ -54,36 +55,38 @@ class BGPQueryHandler:
         
 
         # Preload data source - Load from RIB
+        print "Starting parsing RIB"
         self.parse_rib(FILENAME)
+        print "Finished parsing RIB"
         
         # Update data source - socket handling in seperate thread. 
         # Note: May not clean up nicely.
-        self.server_thread = threading.thread(target=self.listen_for_updates)
+        self.server_thread = threading.Thread(target=self.listen_for_updates)
         self.server_thread.daemon = True
         self.server_thread.start()
 
-    def register_for_update_AS(self, cb, asnum):0
-        if asnum not in self.as_callbacks.keys():
+    def register_for_update_AS(self, cb, asnum):
+        if asnum not in self.update_as_callbacks.keys():
             self.update_as_callbacks[asnum] = list()
-        if cb not in self.as_callbacks[asnum]:
+        if cb not in self.update_as_callbacks[asnum]:
             self.update_as_callbacks[asnum].append(cb)
 
     def register_for_remove_AS(self, cb, asnum):
-        if asnum not in self.as_callbacks.keys():
+        if asnum not in self.remove_as_callbacks.keys():
             self.remove_as_callbacks[asnum] = list()
-        if cb not in self.as_callbacks[asnum]:
+        if cb not in self.remove_as_callbacks[asnum]:
             self.remove_as_callbacks[asnum].append(cb)
 
     def register_for_update_in_path(self, cb, asnum):
-        if asnum not in self.in_path_callbacks.keys():
+        if asnum not in self.update_in_path_callbacks.keys():
             self.update_in_path_callbacks[asnum] = list()
-        if cb not in self.in_path_callbacks[asnum]:
+        if cb not in self.update_in_path_callbacks[asnum]:
             self.update_in_path_callbacks[asnum].append(cb)
 
     def register_for_remove_in_path(self, cb, asnum):
-        if asnum not in self.in_path_callbacks.keys():
+        if asnum not in self.remove_in_path_callbacks.keys():
             self.remove_in_path_callbacks[asnum] = list()
-        if cb not in self.in_path_callbacks[asnum]:
+        if cb not in self.remove_in_path_callbacks[asnum]:
             self.remove_in_path_callbacks[asnum].append(cb)
 
 
@@ -117,16 +120,16 @@ class BGPQueryHandler:
         
         # Check if the main parts of the updates are in the database
         for entry in self.db:
-            if ((entry['asn'] == asn) &&
-                (entry['src_asn'] == src_asn) &&
-                (entry['network'] == network) &&
-                (entry['update'].equivalent(update))):
+            if ((entry['asn'] == asn) and
+                (entry['src_asn'] == src_asn) and
+                (entry['network'] == network) and
+                (entry['update'].equivalent(update) == True)):
                 # They're the same... Do nothing:
                 return
-            if ((entry['asn'] == asn) &&
-                (entry['src_asn'] == src_asn) &&
-                (entry['network'] == network) &&
-                (!entry['update'].equivalent(update))):
+            if ((entry['asn'] == asn) and
+                (entry['src_asn'] == src_asn) and
+                (entry['network'] == network) and
+                (entry['update'].equivalent(update) == False)):
 
                 # Different, remove old routes.
                 if asnin in as_cb:
@@ -166,16 +169,16 @@ class BGPQueryHandler:
         
         # Check if the main parts of the updates are in the database
         for entry in self.db:
-            if ((entry['asn'] == asn) &&
-                (entry['src_asn'] == src_asn) &&
-                (entry['network'] == network) &&
-                (entry['update'].equivalent(update))):
+            if ((entry['asn'] == asn) and
+                (entry['src_asn'] == src_asn) and
+                (entry['network'] == network) and
+                (entry['update'].equivalent(update) == True)):
                 # They're the same... Do nothing:
                 return
-            if ((entry['asn'] == asn) &&
-                (entry['src_asn'] == src_asn) &&
-                (entry['network'] == network) &&
-                (!entry['update'].equivalent(update))):
+            if ((entry['asn'] == asn) and
+                (entry['src_asn'] == src_asn) and
+                (entry['network'] == network) and
+                (entry['update'].equivalent(update) == True)):
 
                 # Different, remove old routes.
                 if asnin in as_cb:
@@ -194,7 +197,7 @@ class BGPQueryHandler:
         prefixes = []
         
         for entry in self.db:
-            if entry['asn'] == asn:
+            if entry['asn'] == str(asn):
                 prefixes.append(entry['network'])
 
         return prefixes
@@ -222,6 +225,7 @@ class BGPQueryHandler:
         aspath = None
         next_hop = None
         network = None
+        linecount = 0
         for line in inputfile:
             if blank_line_re.match(line):
                 update = BGPUpdate(src_as, aspath, next_hop, network)
@@ -233,31 +237,32 @@ class BGPQueryHandler:
                 next_hop = None
                 network = None
             elif aspath_re.match(line):
-                aspath = aspath_re.match(line).group()[0]
+                aspath = aspath_re.match(line).group(1)
             elif network_re.match(line):
-                network = network_re.match(line).group()[0]
+                network = network_re.match(line).group(1)
             elif nexthop_re.match(line):
-                next_hop = nexthop_re.match(line).group()[0]
+                next_hop = nexthop_re.match(line).group(1)
+            linecount = linecount + 1
 
             
         inputfile.close()
 
     def listen_for_updates(self):
-        server_socket = socket(AF_INET, SOCK_STREAM)
-        server_socket.bind('127.0.0.1', SOCKETNUM)
-        server_socket.listen(1)
+        self.server_socket = socket(AF_INET, SOCK_STREAM)
+        self.server_socket.bind(('127.0.0.1', SOCKETNUM))
+        self.server_socket.listen(1)
 
         connection_socket, client_address = server_socket.accept()
         while True:
-            update = pickle.loads(connectionSocket.recv(2048))
+            update = pickle.loads(connection_socket.recv(2048))
             
             if update.type == BGPUpdate.UPDATE:
                 self.new_route(update)
             elif update.type == BGPUpdate.WITHDRAWAL:
                 self.withdraw_route(update)
 
-            connectionSocket.send("THANKS")
-        connectionSocket.close()
+#            connection_socket.send("THANKS")
+        connection_socket.close()
 
             
             

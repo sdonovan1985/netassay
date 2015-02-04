@@ -2,9 +2,9 @@ import sys
 import re
 import pickle
 from bgpoversocket import BGPUpdate
-import time
-import datetime
-import timedelta
+from time import sleep
+from datetime import *
+from socket import *
 
 
 FILENAME   = '/home/mininet/bgptools/update.snip.txt'
@@ -43,7 +43,8 @@ class push_updates:
         announce_re = re.compile('ANNOUNCE')
         time_re = re.compile('TIME: ([0-9 :/]+)')
 
-        self.file = open(filename, 'r')
+        self.file = open(self.filename, 'r')
+
         self.client_socket = socket(AF_INET, SOCK_STREAM)
         self.client_socket.connect((SERVERNAME, SERVERPORT))
 
@@ -74,11 +75,11 @@ class push_updates:
                     delta = current_time - prev_time
                     sleep_time = delta.total_seconds()
                 
-                time.sleep(sleep_time)
+                sleep(sleep_time)
 
                 #Loop through, sending everything.
                 for entry in updates:
-                    client_socket.send(pickle.dumps(updates))
+                    self.client_socket.send(pickle.dumps(updates))
                 
                 # Cleanup all the things that are active.
                 prev_time = current_time
@@ -92,14 +93,14 @@ class push_updates:
                 next_hop = None
 
             elif srcas_re.match(line):
-                src_as = srcas_re.match(line).group()[1]
+                src_as = srcas_re.match(line).group(2)
             elif aspath_re.match(line):
-                aspath = aspath_re.match(line).group()[0]
+                aspath = aspath_re.match(line).group(1)
             elif network_re.match(line):
                 if wd_active:
-                    wd_list.append(network_re.match(line).group()[0])
+                    wd_list.append(network_re.match(line).group(1))
                 elif an_active:
-                    an_list.append(network_re.match(line).group()[0])
+                    an_list.append(network_re.match(line).group(1))
                 else:
                     print "Problem on line " + str(linecount) + " - Not in ANNOUNCE or WITHDRAW"
             elif withdraw_re.match(line):
@@ -109,15 +110,18 @@ class push_updates:
                 wd_active = False
                 an_active = True
             elif time_re.match(line):
-                current_time = parse_time(time_re.match(line).group()[0])
+                current_time = self.parse_time(time_re.match(line).group(1))
 
             linecount = linecount + 1
 
             if linecount % 10000 == 0:
                 print "On line " + str(linecount)
+        
+        self.client_socket.close()
+        self.file.close()
 
     def parse_time(self, timestr):
-        return datetime.strptime(timestr, "%m/%d/%y %H/%M/%S")   
+        return datetime.strptime(timestr, "%m/%d/%y %H:%M:%S")   
 
 
 
@@ -126,3 +130,10 @@ class push_updates:
 
 
 if __name__ == "__main__":
+    updates = push_updates(FILENAME)
+
+    print "Pulling updates from " + FILENAME
+    print "Please press enter to start updates."
+    raw_input("")
+
+    updates.execute()
