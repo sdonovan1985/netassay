@@ -12,8 +12,8 @@ class RegisteredAS:
         
         prefixes = self.handler.query_from_AS(self.asn)
         print "ASN " + str(self.asn) + " starts with " + str(len(prefixes)) + " prefixes."
-        for prefix in prefixes:
-            print "AS Init   with " + str(self.asn) + " " + prefix
+#        for prefix in prefixes:
+#            print "AS Init   with " + str(self.asn) + " " + prefix
 
     def handle_AS_update(prefix):
         print "AS Update  for " + str(self.asn) + " " + prefix

@@ -36,6 +36,13 @@ class BGPUpdate:
             return True
         return False
 
+    def __str__(self):
+        returnstr = "    src_as   : " + str(self.src_as) + "\n"
+        returnstr = returnstr + "    aspath   : " + str(self.aspath)   + "\n"
+        returnstr = returnstr + "    next_hop : " + str(self.next_hop) + "\n"
+        returnstr = returnstr + "    network  : " + str(self.network)  + "\n"
+        return returnstr
+
 
 class BGPQueryHandler:
     def __init__(self):
@@ -252,9 +259,19 @@ class BGPQueryHandler:
         self.server_socket.bind(('127.0.0.1', SOCKETNUM))
         self.server_socket.listen(1)
 
-        connection_socket, client_address = server_socket.accept()
+        print "Waiting for connection."
+        connection_socket, client_address = self.server_socket.accept()
+        print "Connection opened by " + str(client_address)
+
         while True:
-            update = pickle.loads(connection_socket.recv(2048))
+            try:
+                update = pickle.loads(connection_socket.recv(2048))
+            except EOFError:
+                # Client closed socket. 
+                break
+
+            print "Received - "
+            print str(update)
             
             if update.type == BGPUpdate.UPDATE:
                 self.new_route(update)
@@ -263,6 +280,7 @@ class BGPQueryHandler:
 
 #            connection_socket.send("THANKS")
         connection_socket.close()
+        self.server_socket.close()
 
             
             

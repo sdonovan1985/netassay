@@ -74,12 +74,16 @@ class push_updates:
                 else:
                     delta = current_time - prev_time
                     sleep_time = delta.total_seconds()
-                
+
+                print "SLEEPING FOR " + str(sleep_time) + " seconds"
+
                 sleep(sleep_time)
 
                 #Loop through, sending everything.
-                for entry in updates:
-                    self.client_socket.send(pickle.dumps(updates))
+                for update in updates:
+                    print "Sending - " 
+                    print str(update)
+                    self.client_socket.send(pickle.dumps(update))
                 
                 # Cleanup all the things that are active.
                 prev_time = current_time
