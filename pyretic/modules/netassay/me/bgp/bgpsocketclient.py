@@ -1,7 +1,8 @@
 import sys
 import re
-import pickle
-from bgpoversocket import BGPUpdate
+#import pickle
+import cPickle as pickle
+from bgpupdate import *
 from time import sleep
 from datetime import *
 from socket import *

@@ -9,39 +9,15 @@
 import threading
 import sys
 import re
-import pickle
+#import pickle
+import cPickle as pickle
 from socket import *
+from bgpupdate import *
 
 FILENAME = '/home/mininet/bgptools/rib.snip.txt'
 SOCKETNUM = 12345
 
 
-class BGPUpdate:
-    
-    WITHDRAWAL = 1
-    UPDATE     = 2
-
-    def __init__(self, src_as, aspath, next_hop, network):
-        self.src_as = src_as
-        self.aspath = aspath
-        self.next_hop = next_hop
-        self.network = network
-        self.type = None
-
-    def equivalent(self, other):
-        if ((other.src_as == self.src_as) and 
-            (other.aspath == self.aspath) and
-            (other.next_hop == self.next_hop) and
-            (other.network == self.network)):
-            return True
-        return False
-
-    def __str__(self):
-        returnstr = "    src_as   : " + str(self.src_as) + "\n"
-        returnstr = returnstr + "    aspath   : " + str(self.aspath)   + "\n"
-        returnstr = returnstr + "    next_hop : " + str(self.next_hop) + "\n"
-        returnstr = returnstr + "    network  : " + str(self.network)  + "\n"
-        return returnstr
 
 
 class BGPQueryHandler:
@@ -65,7 +41,7 @@ class BGPQueryHandler:
         print "Starting parsing RIB"
         self.parse_rib(FILENAME)
         print "Finished parsing RIB"
-        
+
         # Update data source - socket handling in seperate thread. 
         # Note: May not clean up nicely.
         self.server_thread = threading.Thread(target=self.listen_for_updates)

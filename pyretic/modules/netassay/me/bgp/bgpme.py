@@ -4,7 +4,7 @@
 import logging
 
 
-from bgpqueries import BGPQueryHandler as BGPHandler
+from bgpoversocket import BGPQueryHandler as BGPHandler
 from pyretic.modules.netassay.assayrule import *
 from pyretic.modules.netassay.netassaymatch import *
 from pyretic.lib.corelib import *

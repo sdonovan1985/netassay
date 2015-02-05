@@ -14,7 +14,8 @@
 
 import logging
 from datetime import datetime, timedelta
-from threading import Timer
+from threading import Timer, Lock
+import pprint
 
 class py_timer_manager:
     INSTANCE = None
@@ -26,6 +27,7 @@ class py_timer_manager:
         self.list_of_inactive_timers = []
         self.list_of_active_timers = []
         self.thread_timer = None
+        self.timerlist_lock = Lock()
 
     @classmethod
     def get_instance(cls):
@@ -60,7 +62,6 @@ class py_timer_manager:
             if inserted == False:
                 self.list_of_active_timers.append(timer)
         
-
         # If the timer is the next to expire, stop the running timer
         if first == True:
             if self.thread_timer is not None:
@@ -91,30 +92,35 @@ class py_timer_manager:
         due to removal of entries, or insertion of new entries at the beginning
         of the list_of_active_timers, etc. Pretty much the go-to function.
         '''
+        with self.timerlist_lock:
+            if self.thread_timer is not None:
+                self.thread_timer.cancel()
 
-        if self.thread_timer is not None:
-            self.thread_timer.cancel()
-        # Call back anything that's expired
-        now = datetime.now()
-        for entry in self.list_of_active_timers:
-            if entry.expiration <= now:
-                self.list_of_active_timers.remove(entry)
-                entry.call_function()
+            # Call back anything that's expired
+            now = datetime.now()
+            entries_to_remove = []
+            for entry in self.list_of_active_timers:
+                if entry.expiration <= now:
+                    entries_to_remove.append(entry)
+                    entry.call_function()
+            for entry in entries_to_remove:
+                    self.list_of_active_timers.remove(entry)
+
         
-        # Start the first timer that's not expired
-        if len(self.list_of_active_timers) != 0:
-            delta = self.list_of_active_timers[0].expiration - now
-            self.thread_timer = Timer(delta.total_seconds(), 
-                                      self._restart_timer)
-            # Set the daemon flag: If the main program dies, this will die too
-            # prevents the case where a 3 day long timer for a long lived DNS
-            # entry keeps the program running for ages.
-            self.thread_timer.daemon = True
-            try:
-                self.thread_timer.start()
-            except RuntimeError:
-                # Don't worry about this one.
-                return
+            # Start the first timer that's not expired
+            if len(self.list_of_active_timers) != 0:
+                delta = self.list_of_active_timers[0].expiration - now
+                self.thread_timer = Timer(delta.total_seconds(), 
+                                          self._restart_timer)
+                # Set the daemon flag: If the main program dies, this will die too
+                # prevents the case where a 3 day long timer for a long lived DNS
+                # entry keeps the program running for ages.
+                self.thread_timer.daemon = True
+                try:
+                    self.thread_timer.start()
+                except RuntimeError:
+                    # Don't worry about this one.
+                    return
 
 
 class py_timer:
