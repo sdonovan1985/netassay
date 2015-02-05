@@ -91,9 +91,9 @@ class BGPQueryHandler:
 
 
     def new_route(self, update):
-        aspath = upate.aspath
+        aspath = update.aspath
         asn = aspath.split()[-1]
-        src_as = update.src_as
+        src_asn = update.src_as
         network = update.network
 
         as_cb = self.remove_as_callbacks.keys()
@@ -125,11 +125,11 @@ class BGPQueryHandler:
                 self.db.remove(entry)
                 break
         # add new one to DB
-        self.db.append({'asn':asn, 'src_asn':src_as, 
+        self.db.append({'asn':asn, 'src_asn':src_asn, 
                         'network':network, 'update':update})
 
         # install new rules through the callbacks
-        if asnin in as_cb:
+        if asn in as_cb:
             self.call_update_AS_callbacks(asn, network)
             
         for asnin in aspath.split():

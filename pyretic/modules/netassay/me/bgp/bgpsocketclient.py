@@ -65,10 +65,10 @@ class push_updates:
                 updates = []
                 for prefix in wd_list:
                     updates.append(
-                        BGPUpdate(src_as, aspath, next_hop, prefix))
+                        BGPUpdate(src_as, aspath, next_hop, prefix, BGPUpdate.WITHDRAWAL))
                 for prefix in an_list:
                     updates.append(
-                        BGPUpdate(src_as, aspath, next_hop, prefix))
+                        BGPUpdate(src_as, aspath, next_hop, prefix, BGPUpdate.UPDATE))
 
                 if prev_time == None:
                     sleep_time = 0
