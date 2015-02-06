@@ -13,6 +13,7 @@ import re
 import cPickle as pickle
 from socket import *
 from bgpupdate import *
+import struct
 
 FILENAME = '/home/mininet/bgptools/rib.snip.txt'
 SOCKETNUM = 12345
@@ -32,7 +33,7 @@ class BGPQueryHandler:
         # Dictionary has 4 pieces:
         #    'asn'     : AS number of announced route
         #    'src_asn' : AS that route came from
-        #    'network' : The prefix announced
+        #    'network' : The prefix announcedz
         #    'update'  : the BGPUpdate class that's most current.
         self.db = []
         
@@ -115,7 +116,7 @@ class BGPQueryHandler:
                 (entry['update'].equivalent(update) == False)):
 
                 # Different, remove old routes.
-                if asnin in as_cb:
+                if asn in as_cb:
                     self.call_remove_AS_callbacks(asn, network)
                 
                 for asnin in aspath.split():
@@ -140,9 +141,9 @@ class BGPQueryHandler:
         pass
 
     def withdraw_route(self, update):
-        aspath = upate.aspath
+        aspath = update.aspath
         asn = aspath.split()[-1]
-        src_as = update.src_as
+        src_asn = update.src_as
         network = update.network
 
         as_cb = self.remove_as_callbacks.keys()
@@ -239,11 +240,16 @@ class BGPQueryHandler:
         connection_socket, client_address = self.server_socket.accept()
         print "Connection opened by " + str(client_address)
 
+        length_size = struct.calcsize("I")
         while True:
             try:
-                update = pickle.loads(connection_socket.recv(2048))
+                update_len, = struct.unpack("I", connection_socket.recv(length_size))
+                update = pickle.loads(connection_socket.recv(update_len))
             except EOFError:
                 # Client closed socket. 
+                break
+            except :
+                # Other form of EOFError.
                 break
 
             print "Received - "

@@ -2,6 +2,7 @@ import sys
 import re
 #import pickle
 import cPickle as pickle
+import struct
 from bgpupdate import *
 from time import sleep
 from datetime import *
@@ -11,6 +12,7 @@ from socket import *
 FILENAME   = '/home/mininet/bgptools/update.snip.txt'
 SERVERNAME = '127.0.0.1'
 SERVERPORT = 12345
+SLEEPMULTIPLIER = 0.5
 
 ''' Example message:
 
@@ -75,7 +77,8 @@ class push_updates:
                 else:
                     delta = current_time - prev_time
                     sleep_time = delta.total_seconds()
-
+                    
+                sleep_time = sleep_time * SLEEPMULTIPLIER
                 print "SLEEPING FOR " + str(sleep_time) + " seconds"
 
                 sleep(sleep_time)
@@ -84,6 +87,9 @@ class push_updates:
                 for update in updates:
                     print "Sending - " 
                     print str(update)
+                    update_str = pickle.dumps(update)
+                    update_len = len(update_str)
+                    self.client_socket.send(struct.pack("I",update_len))
                     self.client_socket.send(pickle.dumps(update))
                 
                 # Cleanup all the things that are active.
