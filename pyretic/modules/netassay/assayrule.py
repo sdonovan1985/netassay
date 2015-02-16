@@ -54,6 +54,16 @@ class AssayRule:
         self._rules_to_add = []
         self._rules_to_remove = []
 
+    def number_of_rules(self):
+        return (len(self._raw_srcmac_rules) +
+                len(self._raw_dstmac_rules) +
+                len(self._raw_srcip_rules) +
+                len(self._raw_dstip_rules) + 
+                len(self._raw_srcport_rules) +
+                len(self._raw_dstport_rules) +
+                len(self._raw_protocol_rules) +
+                len(self._raw_other_rules))
+    
 
     def set_update_callback(self, cb):
         # These callbacks take an AssayRule as input
@@ -70,10 +80,8 @@ class AssayRule:
 
         # Stop the running delay timer
         if self._timer is not None:
-            self.logger.debug("    cancelling timer")
             self._timer.cancel()
             self._timer = None
-            self.logger.debug("    cancelled timer: " + str(self._timer))
 
         for rule in self._rules_to_add:
             self.logger.debug("  Adding   " + str(rule))
@@ -85,27 +93,41 @@ class AssayRule:
         self._rules_to_remove = []
         self._update_rules()
         
+    def add_rule_group(self, newrule):
+
+        #FOR EVAL
+        serial = serial_logging.get_number()
+        logging.getLogger("netassay.evaluation2").info("ADD_RULE " + str(serial))
+        logging.getLogger("netassay.evaluation2").info("NO_DELAY " + str(serial))
+
+        self._rules_to_add.append({'rule':newrule, 'serial':serial})
+
+    def finish_rule_group(self):
+        # we want the same behaviour as _rule_timer, so call it directly.
+        self._rule_timer()
+    
+
     def add_rule(self, newrule):
         self.logger.debug("add_rule: timer - " + str(self._timer))
 
         #FOR EVAL
         serial = serial_logging.get_number()
-        logging.getLogger("netassay.evaluation2").critical("ADD_RULE " + str(serial))
+        logging.getLogger("netassay.evaluation2").info("ADD_RULE " + str(serial))
 
 
 
         delay = self.rule_limiter.get_delay()
         if (delay == 0):
 #            self._install_rule(newrule)
-            logging.getLogger("netassay.evaluation2").critical("NO_DELAY " + 
-                                                               str(serial))
+            logging.getLogger("netassay.evaluation2").info("NO_DELAY " + 
+                                                           str(serial))
             self._install_rule({'rule':newrule, 'serial':serial})
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
-            logging.getLogger("netassay.evaluation2").critical("WITH_DELAY " + 
-                                                               str(serial))
+            logging.getLogger("netassay.evaluation2").info("WITH_DELAY " + 
+                                                           str(serial))
 #            self._rules_to_add.append(newrule)
             self._rules_to_add.append({'rule':newrule, 'serial':serial})
 #            self.logger.debug("    new rule: " + str(newrule))
@@ -119,8 +141,8 @@ class AssayRule:
         # Does not check to see if it's a duplicate rule, as this allows the 
         # same rule to be installed for different reasons, and they can be 
         # removed individually.
-        logging.getLogger("netassay.evaluation2").critical("INSTALL_RULE " + 
-                                                           str(newrule['serial']))
+        logging.getLogger("netassay.evaluation2").info("INSTALL_RULE " + 
+                                                       str(newrule['serial']))
         if isinstance(newrule['rule'], Match):
             #FIXME: Can this optimize over multiple items?
             if len(newrule['rule'].map.keys()) == 1:
@@ -162,21 +184,21 @@ class AssayRule:
 
         #FOR EVAL
         serial = serial_logging.get_number()
-        logging.getLogger("netassay.evaluation2").critical("REMOVE_RULE " + 
-                                                           str(serial))
+        logging.getLogger("netassay.evaluation2").info("REMOVE_RULE " + 
+                                                       str(serial))
 
         delay = self.rule_limiter.get_delay()
         if (0 == delay):
 #            self._uninstall_rule(newrule)
-            logging.getLogger("netassay.evaluation2").critical("NO_DELAY " + 
-                                                               str(serial))
+            logging.getLogger("netassay.evaluation2").info("NO_DELAY " + 
+                                                           str(serial))
             self._uninstall_rule({'rule':newrule, 'serial':serial})
             self._update_rules()
             self.logger.debug("    nodelay == True")
 
         else:
-            logging.getLogger("netassay.evaluation2").critical("WITH_DELAY" + 
-                                                               str(serial))
+            logging.getLogger("netassay.evaluation2").info("WITH_DELAY" + 
+                                                           str(serial))
 #            self._rules_to_remove.append(newrule)
             self._rules_to_remove.append({'rule':newrule, 'serial':serial})
 #            self.logger.debug("    new rule: " + str(newrule))
@@ -190,8 +212,8 @@ class AssayRule:
         # In expected order of being true. Please rearrange as appropriate.
         
         # Thanks to: https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
-        logging.getLogger("netassay.evaluation2").critical("UNINSTALL_RULE" + 
-                                                           str(newrule['serial']))
+        logging.getLogger("netassay.evaluation2").info("UNINSTALL_RULE" + 
+                                                       str(newrule['serial']))
         if filter(lambda rule: rule['rule'] == newrule, 
                   self._raw_srcip_rules) != []:
             self._raw_srcip_rules.remove(
@@ -253,22 +275,27 @@ class AssayRule:
 
     def _update_rules(self):
         self.logger.debug("_update_rules() called")
-        logging.getLogger("netassay.evaluation2").critical("UPDATE_RULES")
+        logging.getLogger("netassay.evaluation2").info("UPDATE_RULES")
 
         # check if rules have changed
         temp_rule_list = self._generate_list_of_rules()
         # If they're the same, do nothing
         if set(temp_rule_list) == set(self._rule_list):
             self.logger.debug("_update_rules: No changes in rule list")
-            logging.getLogger("netassay.evaluation2").critical("NO_RULES_TO_ADD")
+            logging.getLogger("netassay.evaluation2").info("NO_RULES_TO_ADD " + 
+                                                           str(len(self._rule_list)) + " " +
+                                                           str(self.number_of_rules()))
         else:
             # if they're different, call the callbacks
             self._rule_list = temp_rule_list
-            logging.getLogger("netassay.evaluation2").critical("RULES_TO_ADD")
+            logging.getLogger("netassay.evaluation2").info("RULES_TO_ADD " + 
+                                                           str(len(self._rule_list)) + " " +
+                                                           str(self.number_of_rules()))
+
             for cb in self.update_callbacks:
                 self.logger.debug("_update_rules: calling " + str(cb))
                 cb()
-        logging.getLogger("netassay.evaluation2").critical("UPDATE_RULES_FINISHED")
+        logging.getLogger("netassay.evaluation2").info("UPDATE_RULES_FINISHED")
 
 
     def _generate_list_of_rules(self):

@@ -25,6 +25,7 @@ class RuleLimiter:
         self._logged_counts = [0] * self.COUNTS
         self._current_count = 0
         self._timer = None
+        self._delaying = False
 
         # Start the timer to get count rates
         self._reset_timer()
@@ -35,16 +36,23 @@ class RuleLimiter:
             cls.INSTANCE = RuleLimiter()
         return cls.INSTANCE
 
+    def start_delay(self):
+        self._delaying = True
+
     def get_delay(self):
         '''
         Whenever a new rule comes in, this is called. 
             It returns 0 if the rule should be installed immediately.
             It returns a delay in fraction of a second.
         '''
+        if self._delaying == False:
+            # insert small delay, such that, during init, things are installed 
+            # in batches. BGP, for instance, installs in batches.
+            return 0.01
         delay = sum(self._logged_counts) + self._current_count
         self._current_count = self._current_count + 1
-#        self.logger.debug("DELAY -------- " + str(delay * self.DELAY_MULTIPLIER) + "   " + str(self._logged_counts))
-        return delay * self.DELAY_MULTIPLIER
+        self.logger.debug("DELAY -------- " + str(delay * self.DELAY_MULTIPLIER) + "   " + str(self._logged_counts))
+        return min(0.1, delay * self.DELAY_MULTIPLIER)
             
     def _reset_timer(self):
         '''

@@ -5,6 +5,7 @@ import logging
 
 from pyretic.modules.netassay.me.dns.dnsme import DNSMetadataEngine
 from pyretic.modules.netassay.me.bgp.bgpme import BGPMetadataEngine
+from pyretic.modules.netassay.rulelimiter import RuleLimiter
 
 class MainControlModuleException(Exception):
     pass
@@ -42,6 +43,10 @@ class AssayMainControlModule:
         if cls.INSTANCE is None:
             cls.INSTANCE = AssayMainControlModule()
         return cls.INSTANCE
+
+    def init_complete(self):
+        rl = RuleLimiter.get_instance()
+        rl.start_delay()
 
     def setup_logger(self):
         formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')

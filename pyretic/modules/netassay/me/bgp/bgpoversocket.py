@@ -252,8 +252,8 @@ class BGPQueryHandler:
                 # Other form of EOFError.
                 break
 
-            print "Received - "
-            print str(update)
+#            print "Received - "
+#            print str(update)
             
             if update.type == BGPUpdate.UPDATE:
                 self.new_route(update)

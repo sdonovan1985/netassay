@@ -6,17 +6,17 @@ import datetime
 def parse_file(inputfile, outputfile):
 
     #All the regexes
-    pre = re.compile('(.+?) netassay.evaluation: CRITICAL SETUP COMPLETE')
-    install_rule = re.compile('(.+?) netassay.evaluation2: CRITICAL INSTALL_RULE ([0-9]+)')
-    uninstall_rule = re.compile('(.+?) netassay.evaluation2: CRITICAL UNINSTALL_RULE ([0-9]+)')
-    add_rule = re.compile('(.+?) netassay.evaluation2: CRITICAL ADD_RULE ([0-9]+)')
-    remove_rule = re.compile('(.+?) netassay.evaluation2: CRITICAL REMOVE_RULE ([0-9]+)')
-    no_delay = re.compile('(.+?) netassay.evaluation2: CRITICAL NO_DELAY ([0-9]+)')
-    with_delay = re.compile('(.+?) netassay.evaluation2: CRITICAL WITH_DELAY ([0-9]+)')
-    rules_to_add = re.compile('(.+?) netassay.evaluation2: CRITICAL RULES_TO_ADD')
-    no_rules_to_add = re.compile('(.+?) netassay.evaluation2: CRITICAL NO_RULES_TO_ADD')
-    update_rules = re.compile('(.+?) netassay.evaluation2: CRITICAL UPDATE_RULES')
-    update_rules_finished = re.compile('(.+?) netassay.evaluation2: CRITICAL UPDATE_RULES_FINISHED')
+    pre = re.compile('(.+?) netassay.evaluation2: CRITICAL SETUP COMPLETE')
+    install_rule = re.compile('(.+?) netassay.evaluation2: INFO INSTALL_RULE ([0-9]+)')
+    uninstall_rule = re.compile('(.+?) netassay.evaluation2: INFO UNINSTALL_RULE ([0-9]+)')
+    add_rule = re.compile('(.+?) netassay.evaluation2: INFO ADD_RULE ([0-9]+)')
+    remove_rule = re.compile('(.+?) netassay.evaluation2: INFO REMOVE_RULE ([0-9]+)')
+    no_delay = re.compile('(.+?) netassay.evaluation2: INFO NO_DELAY ([0-9]+)')
+    with_delay = re.compile('(.+?) netassay.evaluation2: INFO WITH_DELAY ([0-9]+)')
+    rules_to_add = re.compile('(.+?) netassay.evaluation2: INFO RULES_TO_ADD ([0-9]+) ([0-9]+)')
+    no_rules_to_add = re.compile('(.+?) netassay.evaluation2: INFO NO_RULES_TO_ADD ([0-9]+) ([0-9]+)')
+    update_rules = re.compile('(.+?) netassay.evaluation2: INFO UPDATE_RULES')
+    update_rules_finished = re.compile('(.+?) netassay.evaluation2: INFO UPDATE_RULES_FINISHED')
 
     outstanding = {}
     updating = {}
