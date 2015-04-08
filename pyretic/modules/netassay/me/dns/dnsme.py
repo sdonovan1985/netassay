@@ -158,7 +158,7 @@ class DNSMetadataEntry(MetadataEntry):
                     self.rule.remove_rule(Match(dict(dstip=IPAddr(str(addr)))))
 
             self._active_results = new_active_results
-        except (resolver.NoAnswer, exception.Timeout):
+        except (resolver.NoAnswer, exception.Timeout, resolver.NXDOMAIN):
             self.logger.info("Could not query for " + self.rule.value + ". Trying again in 30 seconds.")
             self._active_timer = Timer(30, self._active_get_mapping_expired)
             self._active_timer.start()

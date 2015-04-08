@@ -31,7 +31,7 @@ class AssayRule:
         self.rule_limiter = RuleLimiter.get_instance()
 
         self.logger.debug("   self.type  = " + str(ruletype))
-        self.logger.debug("   self.value = " + value)
+        self.logger.debug("   self.value = " + str(value))
 
         # Rules should be proper pyretic rules
         # _raw_xxx_rules is the naive set of rules that are manipulated. When 
@@ -299,32 +299,9 @@ class AssayRule:
 
 
     def _generate_list_of_rules(self):
-        # This generates teh list of rules and returns them This allows us
+        # This generates the list of rules and returns them This allows us
         # to check to see if there's a difference between versions
         temp_rule_list = []
-        
-        # Append non-optimized rules, remove dupes
-        for ruledict in self._raw_protocol_rules:
-            rule = ruledict['rule']
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
-        for ruledict in self._raw_srcmac_rules:
-            rule = ruledict['rule']
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
-        for ruledict in self._raw_dstmac_rules:
-            rule = ruledict['rule']
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
-        for ruledict in self._raw_srcport_rules:
-            rule = ruledict['rule']
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
-        for ruledict in self._raw_dstport_rules:
-            rule = ruledict['rule']
-            if rule not in temp_rule_list:
-                temp_rule_list.append(rule)
-
 
 
         # Optimized rules 
@@ -381,9 +358,6 @@ class AssayRule:
         # optimize_ip_prefix() uses the functions in ipaddr-py package. Cleaner.
 #        optimize_ip(temp_rule_list, self._raw_srcip_rules, 'srcip')
 #        optimize_ip(temp_rule_list, self._raw_dstip_rules, 'dstip')
-        optimize_ip_prefix(temp_rule_list, self._raw_srcip_rules, 'srcip')
-        optimize_ip_prefix(temp_rule_list, self._raw_dstip_rules, 'dstip')
-
 
         # Optimizing others - function may be useful outside of here.
         def optimize_others(rule_list, other_rule_list):
@@ -459,7 +433,85 @@ class AssayRule:
                 if rule not in rule_list:
                     rule_list.append(rule)
 
+        # Append non-optimized rules, remove dupes
+        def dedupe_non_optimized(temp_rule_list):
+            for ruledict in self._raw_protocol_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_srcmac_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_dstmac_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_srcport_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_dstport_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+
+        def only_dedupe(temp_rule_list):
+            for ruledict in self._raw_srcip_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_dstip_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+            for ruledict in self._raw_other_rules:
+                rule = ruledict['rule']
+                if rule not in temp_rule_list:
+                    temp_rule_list.append(rule)
+
+        def completely_unoptimized(temp_rule_list):
+            for ruledict in self._raw_protocol_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_srcmac_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_dstmac_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_srcport_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_dstport_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_srcip_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_dstip_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+            for ruledict in self._raw_other_rules:
+                rule = ruledict['rule']
+                temp_rule_list.append(rule)
+
+
+# with-optimizations        
+        optimize_ip_prefix(temp_rule_list, self._raw_srcip_rules, 'srcip')
+        optimize_ip_prefix(temp_rule_list, self._raw_dstip_rules, 'dstip')
         optimize_others(temp_rule_list, self._raw_other_rules)
+
+# prefix-optimizations-only
+#        optimize_ip_prefix(temp_rule_list, self._raw_srcip_rules, 'srcip')
+#        optimize_ip_prefix(temp_rule_list, self._raw_dstip_rules, 'dstip')
+
+# dedupe-only
+#        dedupe_non_optimized(temp_rule_list)
+#        only_dedupe(temp_rule_list)
+
+# no-optimizations
+#        completely_unoptimized(temp_rule_list)
 
         return temp_rule_list
 

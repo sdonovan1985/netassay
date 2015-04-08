@@ -4,6 +4,7 @@
 import logging
 
 from pyretic.core.language import DynamicFilter, drop, union
+#from pyretic.core.language import DynamicFilter, drop, parallel
 from pyretic.modules.netassay.assayrule import *
 
 
@@ -32,9 +33,7 @@ class NetAssayMatch(DynamicFilter):
             self.policy = drop
         else:
             new_policy = union(listofrules)
-#            new_policy = listofrules[0]
-#            for rule in listofrules[1:]:
-#                new_policy = new_policy + rule
+#            new_policy = parallel(listofrules)
             self.policy = new_policy
 
         self.matchaction.children_update()
@@ -46,7 +45,7 @@ class NetAssayMatch(DynamicFilter):
 #        return set()
 
     def __repr__(self):
-        retval = self.__class__.__name__ + ": " + self.assayrule.value
+        retval = self.__class__.__name__ + ": " + str(self.assayrule.value)
 #        for rule in self.assayrule.get_list_of_rules():
 #            retval = retval + "\n   " + str(rule)
         return retval
