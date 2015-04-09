@@ -22,7 +22,7 @@ import logging
 # paths, depending on what is needed.
 
 # Run after the topology is running.
-# python pyretic.py -m p0 pyretic.modules.netassay.test.test_assay_url
+# python pyretic.py pyretic.modules.netassay.test.test_assay_url
 # h1 ping yahoo.com
 # h1 ping google.com
 

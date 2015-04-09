@@ -22,7 +22,7 @@ import logging
 # paths, depending on what is needed.
 
 # Run after the topology is running.
-# python pyretic.py -m p0 pyretic.modules.netassay.test.test_assay_as
+# python pyretic.py pyretic.modules.netassay.test.test_assay_as
 # ping 1.0.6.1
 
 class TestAssay(DynamicPolicy):
