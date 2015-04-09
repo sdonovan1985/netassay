@@ -15,7 +15,9 @@ from socket import *
 from bgpupdate import *
 import struct
 
-FILENAME = '/home/mininet/bgptools/rib.snip.txt'
+# This is for Sean's system.
+#FILENAME = '/home/mininet/bgptools/rib.snip.txt'
+FILENAME = 'pyretic/modules/netassay/me/bgp/rib.snip.txt'
 SOCKETNUM = 12345
 
 
